@@ -2,10 +2,10 @@
 <meta charset="utf-8">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='11' cy='14' r='6' fill='%234FD1C5'/%3E%3Ccircle cx='22' cy='20' r='4.5' fill='%23FF6B6B'/%3E%3Ccircle cx='21' cy='9' r='3' fill='%23FFC145'/%3E%3C/svg%3E">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>Primordia — a laboratory of living ink</title>
+<title>Dots — particle life</title>
 <style>
   /* ============================================================
-     PRIMORDIA — Particle Life
+     DOTS — Particle Life
      Built by Claude Fable 5
      Self-contained. No external requests.
      ============================================================ */
@@ -67,36 +67,6 @@
         rgba(13,20,26,0.55) 78%,
         rgba(15,22,28,0.92) 100%);
     z-index: 2;
-  }
-
-  /* ---------------- Specimen label / wordmark ---------------- */
-  #mark {
-    position: fixed;
-    top: 22px;
-    left: 26px;
-    z-index: 6;
-    user-select: none;
-    pointer-events: none;
-  }
-  #mark .word {
-    font-family: var(--serif);
-    font-weight: 600;
-    font-style: italic;
-    font-size: 27px;
-    letter-spacing: 0.01em;
-    color: var(--value);
-    line-height: 1;
-    text-shadow: 0 0 22px rgba(79,209,197,0.10);
-  }
-  #mark .sub {
-    margin-top: 7px;
-    font-family: var(--sans);
-    font-size: 9.5px;
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
-    color: var(--text-dim);
-    max-width: 260px;
-    line-height: 1.55;
   }
 
   /* ---------------- Vital signs (top-right) ---------------- */
@@ -408,6 +378,49 @@
   }
   .seed:hover { color: var(--value); border-color: var(--hair); background: rgba(30,42,50,0.4); }
   .seed.on { color: #CFF6F1; border-color: rgba(79,209,197,0.4); background: rgba(79,209,197,0.1); }
+  .seed.user { display: inline-flex; align-items: center; gap: 7px; }
+  .seed .del {
+    color: var(--text-dim);
+    font-family: var(--mono);
+    font-size: 11px;
+    line-height: 1;
+    padding: 0 1px;
+  }
+  .seed .del:hover { color: #FF6B6B; }
+
+  /* ---------------- My Setups save row ---------------- */
+  .saverow { display: flex; gap: 7px; margin-bottom: 9px; }
+  #saveName {
+    flex: 1;
+    min-width: 0;
+    background: #0C1216;
+    border: 1px solid var(--hair-soft);
+    border-radius: 8px;
+    color: var(--value);
+    font-family: var(--sans);
+    font-size: 11px;
+    padding: 7px 10px;
+  }
+  #saveName:focus { outline: none; border-color: rgba(79,209,197,0.42); }
+  #saveName::placeholder { color: var(--text-dim); }
+  .saverow button.act { padding: 7px 12px; }
+
+  /* editable numeric readouts next to sliders */
+  input.num {
+    background: none;
+    border: none;
+    border-bottom: 1px dashed transparent;
+    color: var(--value);
+    font-family: var(--mono);
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+    width: 46px;
+    padding: 0;
+    cursor: text;
+  }
+  input.num:hover { border-bottom-color: var(--hair); }
+  input.num:focus { outline: none; border-bottom: 1px solid rgba(79,209,197,0.55); }
 
   /* ---------------- About overlay ---------------- */
   #aboutBtn {
@@ -520,7 +533,6 @@
 
   @media (max-width: 720px) {
     #panel { width: calc(100vw - 24px); right: 12px; bottom: 12px; max-height: 62vh; }
-    #mark .sub { display: none; }
     #vitals { gap: 12px; }
     #spark { width: 74px; }
     #hintFloat { display: none; }
@@ -529,11 +541,6 @@
 
 <canvas id="field"></canvas>
 <div id="vignette"></div>
-
-<div id="mark">
-  <div class="word">Primordia</div>
-  <div class="sub">Six species · one secret matrix</div>
-</div>
 
 <div id="vitals">
   <div class="vital"><div class="k">FPS</div><div class="v" id="vFps">—</div></div>
@@ -576,6 +583,20 @@
   <div class="divider"></div>
 
   <div>
+    <div class="row" style="margin-bottom:9px">
+      <span class="section-title">My Setups</span>
+      <span class="hint">matrix + sliders</span>
+    </div>
+    <div class="saverow">
+      <input id="saveName" type="text" placeholder="setup name…" maxlength="24" autocomplete="off">
+      <button class="act" id="btnSave">Save</button>
+    </div>
+    <div class="seeds" id="userSeeds"></div>
+  </div>
+
+  <div class="divider"></div>
+
+  <div>
     <div class="row" style="margin-bottom:10px">
       <span class="section-title">Population</span>
       <span class="hint">per species · drag &#8596;</span>
@@ -613,15 +634,17 @@
 <div id="about">
   <div id="aboutCard">
     <button id="aboutClose">&times;</button>
-    <h1>Primordia</h1>
+    <h1>Dots</h1>
     <div class="tag">Six species, one secret matrix — watch life invent itself.</div>
     <p>Every particle obeys one rule: a short-range shove that keeps neighbours from overlapping, blended with a mid-range pull-or-push whose sign and strength come from a single <b>6&times;6 matrix</b>. That grid is the entire genome. Warm cells attract, hollow cells repel — and because attraction can be <i>asymmetric</i> (coral chases aqua while aqua flees coral), the field spontaneously grows cells, chains, orbits and hunts.</p>
     <p>Scrub any matrix cell and the ecosystem visibly reorganises. Hit <b>Randomize</b> and it melts and re-crystallises over a smooth morph. Nothing here is scripted — it is all emergence from numbers you can edit.</p>
-    <p>Switch on the <b>Living Web</b> and Primordia draws a glowing filament between every pair of particles caught in a mutual attraction — so the invisible bonds holding a cell or a chain together become visible in real time.</p>
+    <p>Switch on the <b>Living Web</b> and Dots draws a glowing filament between every pair of particles caught in a mutual attraction — so the invisible bonds holding a cell or a chain together become visible in real time.</p>
+    <p><b>My Setups</b> saves the whole instrument — matrix, populations and physics — into your browser, so a creature you discover is never lost.</p>
     <div class="keys">
       <span class="kb">click + hold</span><span class="kd">gentle repulsor — stir the soup</span>
       <span class="kb">shift + hold</span><span class="kd">attractor — gather particles</span>
       <span class="kb">drag matrix cell</span><span class="kd">scrub attraction from &minus;1 to +1</span>
+      <span class="kb">click a number</span><span class="kd">type an exact slider value, Enter applies</span>
       <span class="kb">space</span><span class="kd">pause / resume the simulation</span>
       <span class="kb">R</span><span class="kd">randomize the matrix</span>
       <span class="kb">B</span><span class="kd">toggle the living web of bonds</span>
@@ -1397,7 +1420,7 @@
       wrap.innerHTML = `
         <div class="lbl">
           <span class="name"><span class="swatch" style="background:${COLOR_CSS[s]};box-shadow:0 0 6px ${COLOR_CSS[s]}"></span>Species ${s+1}</span>
-          <span class="num"></span>
+          <input class="num" type="text" inputmode="numeric" aria-label="Species ${s+1} population">
         </div>
         <div class="track"><div class="bar"></div><div class="knob"></div></div>`;
       popsEl.appendChild(wrap);
@@ -1410,6 +1433,10 @@
         setPopulation(s, frac * 800);
         refreshPopUI();
       });
+      attachNumEdit(num, () => String(pop[s]), (v) => {
+        setPopulation(s, v);
+        refreshPopUI();
+      });
     }
     refreshPopUI();
   }
@@ -1417,7 +1444,7 @@
     for (let s = 0; s < NS; s++) {
       if (!popNumEls[s]) continue;
       const frac = Math.max(0, Math.min(1, pop[s] / 800));
-      popNumEls[s].textContent = pop[s];
+      if (document.activeElement !== popNumEls[s]) popNumEls[s].value = pop[s];
       popBarEls[s].style.width = (frac * 100) + "%";
       popBarEls[s].style.background =
         `linear-gradient(90deg, ${hexA(s,0.3)}, ${COLOR_CSS[s]})`;
@@ -1445,7 +1472,7 @@
       const wrap = document.createElement("div");
       wrap.className = "scrub";
       wrap.innerHTML = `
-        <div class="lbl"><span class="name">${def.label}</span><span class="num"></span></div>
+        <div class="lbl"><span class="name">${def.label}</span><input class="num" type="text" inputmode="decimal" aria-label="${def.label}"></div>
         <div class="track"><div class="bar"></div><div class="knob"></div></div>`;
       globalsEl.appendChild(wrap);
       globalNumEls[def.key] = wrap.querySelector(".num");
@@ -1459,13 +1486,19 @@
           if (def.onChange) def.onChange();
           refreshGlobalsUI();
         });
+      attachNumEdit(globalNumEls[def.key], () => String(def.fmt(P[def.key])), (v) => {
+        P[def.key] = Math.max(def.min, Math.min(def.max, v));
+        if (def.onChange) def.onChange();
+        refreshGlobalsUI();
+      });
     });
     refreshGlobalsUI();
   }
   function refreshGlobalsUI() {
     GLOBAL_DEFS.forEach(def => {
       const frac = Math.max(0, Math.min(1, (P[def.key] - def.min) / (def.max - def.min)));
-      globalNumEls[def.key].textContent = def.fmt(P[def.key]);
+      if (document.activeElement !== globalNumEls[def.key])
+        globalNumEls[def.key].value = def.fmt(P[def.key]);
       globalBarEls[def.key].style.width = (frac * 100) + "%";
       globalKnobEls[def.key].style.left = (frac * 100) + "%";
     });
@@ -1494,6 +1527,22 @@
     track.addEventListener("pointercancel", end);
   }
 
+  // Editable numeric readout: click the number, type an exact value,
+  // Enter or clicking away applies (clamped), Escape reverts.
+  function attachNumEdit(input, get, apply) {
+    input.value = get();
+    input.addEventListener("focus", () => input.select());
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") input.blur();
+      else if (e.key === "Escape") { input.value = get(); input.blur(); }
+    });
+    input.addEventListener("blur", () => {
+      const v = parseFloat(input.value.replace(",", "."));
+      if (isFinite(v)) apply(v);
+      input.value = get();
+    });
+  }
+
   // ============================================================
   //  Seed library UI
   // ============================================================
@@ -1517,7 +1566,121 @@
   }
   function clearSeedSelection() {
     seedBtns.forEach(b => b.classList.remove("on"));
+    userChips.forEach(b => b.classList.remove("on"));
   }
+
+  // ============================================================
+  //  My Setups — saved snapshots of matrix + sliders (localStorage)
+  // ============================================================
+  const LS_KEY = "dots.setups.v1";
+  const userSeedsEl = document.getElementById("userSeeds");
+  const saveNameEl = document.getElementById("saveName");
+  const userChips = [];
+
+  function loadSetups() {
+    try {
+      const list = JSON.parse(localStorage.getItem(LS_KEY) || "[]");
+      return Array.isArray(list) ? list : [];
+    } catch (_) { return []; }
+  }
+  function persistSetups(list) {
+    try { localStorage.setItem(LS_KEY, JSON.stringify(list)); } catch (_) {}
+  }
+
+  function snapshotSetup(name) {
+    return {
+      name,
+      matrix: Array.from(matrix, v => Math.round(v * 100) / 100),
+      pop: pop.slice(),
+      phys: { rMax: P.rMax, friction: P.friction, dt: P.dt, forceScale: P.forceScale },
+      bonds: showBonds,
+    };
+  }
+
+  function applySetup(su) {
+    if (su.phys) {
+      GLOBAL_DEFS.forEach(def => {
+        const v = su.phys[def.key];
+        if (typeof v === "number" && isFinite(v))
+          P[def.key] = Math.max(def.min, Math.min(def.max, v));
+      });
+      buildGrid();
+      refreshGlobalsUI();
+    }
+    if (Array.isArray(su.pop)) {
+      for (let s = 0; s < NS; s++)
+        if (typeof su.pop[s] === "number") setPopulation(s, su.pop[s]);
+      refreshPopUI();
+    }
+    if (Array.isArray(su.matrix) && su.matrix.length === NS * NS) {
+      commitMorph(Float32Array.from(su.matrix), 700);
+    }
+    if (typeof su.bonds === "boolean" && su.bonds !== showBonds) {
+      showBonds = su.bonds;
+      bondSwitch.classList.toggle("on", showBonds);
+      bondSwitch.setAttribute("aria-checked", showBonds ? "true" : "false");
+    }
+  }
+
+  function buildUserSeedsUI(selectedName) {
+    const list = loadSetups();
+    userSeedsEl.innerHTML = "";
+    userChips.length = 0;
+    if (!list.length) {
+      const empty = document.createElement("span");
+      empty.className = "hint";
+      empty.textContent = "nothing saved yet — tune the instrument and hit Save";
+      userSeedsEl.appendChild(empty);
+      return;
+    }
+    list.forEach((su, i) => {
+      const chip = document.createElement("div");
+      chip.className = "seed user";
+      const nm = document.createElement("span");
+      nm.textContent = su.name;
+      const del = document.createElement("span");
+      del.className = "del";
+      del.textContent = "×";
+      del.title = "Delete";
+      del.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const l = loadSetups();
+        l.splice(i, 1);
+        persistSetups(l);
+        buildUserSeedsUI();
+      });
+      chip.appendChild(nm);
+      chip.appendChild(del);
+      chip.addEventListener("click", () => {
+        applySetup(su);
+        clearSeedSelection();
+        chip.classList.add("on");
+      });
+      if (su.name === selectedName) chip.classList.add("on");
+      userSeedsEl.appendChild(chip);
+      userChips.push(chip);
+    });
+  }
+
+  document.getElementById("btnSave").addEventListener("click", () => {
+    let name = (saveNameEl.value || "").trim();
+    const list = loadSetups();
+    if (!name) {
+      let n = list.length + 1;
+      while (list.some(s => s.name === "Setup " + n)) n++;
+      name = "Setup " + n;
+    }
+    const su = snapshotSetup(name);
+    const existing = list.findIndex(s => s.name === name);
+    if (existing >= 0) list[existing] = su; else list.push(su);
+    persistSetups(list);
+    saveNameEl.value = "";
+    clearSeedSelection();
+    buildUserSeedsUI(name);
+  });
+  saveNameEl.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") document.getElementById("btnSave").click();
+  });
 
   // ============================================================
   //  Buttons & panel toggles
@@ -1584,8 +1747,10 @@
   //  Keyboard
   // ============================================================
   window.addEventListener("keydown", (e) => {
-    // let a focused button handle Space/Enter itself (a11y)
+    // typing in a text field must never trigger hotkeys (R, B, space…)
     const tag = e.target && e.target.tagName;
+    if (tag === "INPUT" || tag === "TEXTAREA") return;
+    // let a focused button handle Space/Enter itself (a11y)
     if (tag === "BUTTON" && (e.key === " " || e.key === "Enter")) return;
     if (e.key === " ") { running = !running; e.preventDefault(); }
     else if (e.key === "r" || e.key === "R") {
@@ -1638,6 +1803,7 @@
     reseed();
     buildMatrixUI();
     buildSeedsUI();
+    buildUserSeedsUI();
     buildPopUI();
     buildGlobalsUI();
     // mark the default seed
@@ -1652,10 +1818,10 @@
   try {
     boot();
   } catch (err) {
-    console.error("Primordia failed to start:", err);
+    console.error("Dots failed to start:", err);
     document.body.innerHTML =
       '<div style="color:#8FA0A8;font-family:sans-serif;padding:40px;font-size:14px">' +
-      'Primordia could not start in this browser. ' + (err && err.message) + '</div>';
+      'Dots could not start in this browser. ' + (err && err.message) + '</div>';
   }
 
 })();
