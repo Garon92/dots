@@ -1,0 +1,1662 @@
+<!doctype html>
+<meta charset="utf-8">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='11' cy='14' r='6' fill='%234FD1C5'/%3E%3Ccircle cx='22' cy='20' r='4.5' fill='%23FF6B6B'/%3E%3Ccircle cx='21' cy='9' r='3' fill='%23FFC145'/%3E%3C/svg%3E">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Primordia — a laboratory of living ink</title>
+<style>
+  /* ============================================================
+     PRIMORDIA — Particle Life
+     Built by Claude Fable 5
+     Self-contained. No external requests.
+     ============================================================ */
+
+  :root {
+    --ink:        #0A0E12;
+    --ink-lift:   #0F161C;
+    --panel:      #10161C;
+    --hair:       #1E2A32;
+    --hair-soft:  #17222A;
+    --text:       #8FA0A8;
+    --value:      #D6E2E6;
+    --text-dim:   #5A6A72;
+
+    --sp0: #FF6B6B; /* Coral     */
+    --sp1: #FFC145; /* Amber     */
+    --sp2: #B8E062; /* Chartreuse*/
+    --sp3: #4FD1C5; /* Aqua      */
+    --sp4: #7C8CFF; /* Iris      */
+    --sp5: #E56BF0; /* Magenta   */
+
+    --serif: "Iowan Old Style", "Palatino Linotype", "Palatino", "Georgia", "Times New Roman", serif;
+    --sans:  ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    --mono:  ui-monospace, "SF Mono", "SFMono-Regular", "Menlo", "Consolas", "Liberation Mono", monospace;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+
+  body {
+    background: var(--ink);
+    color: var(--text);
+    font-family: var(--sans);
+    overflow: hidden;
+    position: fixed;
+    inset: 0;
+    -webkit-font-smoothing: antialiased;
+    -webkit-tap-highlight-color: transparent;
+    cursor: crosshair;
+  }
+
+  #field {
+    position: fixed;
+    inset: 0;
+    display: block;
+    width: 100%;
+    height: 100%;
+    touch-action: none;
+  }
+
+  /* Warm radial vignette lifting the edges of the ink ground */
+  #vignette {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(130% 120% at 50% 46%,
+        rgba(10,14,18,0) 40%,
+        rgba(13,20,26,0.55) 78%,
+        rgba(15,22,28,0.92) 100%);
+    z-index: 2;
+  }
+
+  /* ---------------- Specimen label / wordmark ---------------- */
+  #mark {
+    position: fixed;
+    top: 22px;
+    left: 26px;
+    z-index: 6;
+    user-select: none;
+    pointer-events: none;
+  }
+  #mark .word {
+    font-family: var(--serif);
+    font-weight: 600;
+    font-style: italic;
+    font-size: 27px;
+    letter-spacing: 0.01em;
+    color: var(--value);
+    line-height: 1;
+    text-shadow: 0 0 22px rgba(79,209,197,0.10);
+  }
+  #mark .sub {
+    margin-top: 7px;
+    font-family: var(--sans);
+    font-size: 9.5px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    max-width: 260px;
+    line-height: 1.55;
+  }
+
+  /* ---------------- Vital signs (top-right) ---------------- */
+  #vitals {
+    position: fixed;
+    top: 20px;
+    right: 24px;
+    z-index: 6;
+    display: flex;
+    gap: 20px;
+    align-items: center;
+    font-family: var(--mono);
+    user-select: none;
+    pointer-events: none;
+  }
+  .vital { text-align: right; line-height: 1.1; }
+  .vital .k {
+    font-family: var(--sans);
+    font-size: 8.5px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+  }
+  .vital .v {
+    font-size: 15px;
+    color: var(--value);
+    font-variant-numeric: tabular-nums;
+    margin-top: 3px;
+  }
+  #spark {
+    display: block;
+    width: 108px;
+    height: 30px;
+    opacity: 0.9;
+  }
+
+  /* ---------------- Control panel ---------------- */
+  #panel {
+    position: fixed;
+    z-index: 5;
+    right: 22px;
+    bottom: 22px;
+    width: 344px;
+    max-height: calc(100vh - 44px);
+    background: rgba(16,22,28,0.72);
+    -webkit-backdrop-filter: blur(6px) saturate(120%);
+    backdrop-filter: blur(6px) saturate(120%);
+    border: 1px solid var(--hair);
+    border-radius: 14px;
+    box-shadow:
+      0 24px 60px -18px rgba(0,0,0,0.7),
+      inset 0 1px 0 rgba(255,255,255,0.03);
+    padding: 16px 16px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 13px;
+    transition: transform 0.42s cubic-bezier(.22,.61,.36,1), opacity 0.3s;
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-width: thin;
+    scrollbar-color: var(--hair) transparent;
+  }
+  #panel::-webkit-scrollbar { width: 8px; }
+  #panel::-webkit-scrollbar-thumb { background: var(--hair); border-radius: 8px; }
+  #panel::-webkit-scrollbar-track { background: transparent; }
+
+  body.panel-collapsed #panel {
+    transform: translateX(calc(100% + 40px));
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  /* edge tab to reopen */
+  #tab {
+    position: fixed;
+    z-index: 5;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%) translateX(100%);
+    background: rgba(16,22,28,0.72);
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
+    border: 1px solid var(--hair);
+    border-right: none;
+    border-radius: 10px 0 0 10px;
+    padding: 15px 9px;
+    cursor: pointer;
+    writing-mode: vertical-rl;
+    font-family: var(--sans);
+    font-size: 9.5px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--text);
+    transition: transform 0.42s cubic-bezier(.22,.61,.36,1), color 0.2s;
+    user-select: none;
+  }
+  #tab:hover { color: var(--value); }
+  body.panel-collapsed #tab { transform: translateY(-50%) translateX(0); }
+
+  .row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .section-title {
+    font-family: var(--sans);
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+  }
+  .hint {
+    font-size: 8.5px;
+    letter-spacing: 0.02em;
+    color: var(--text-dim);
+    font-family: var(--sans);
+  }
+  .divider { height: 1px; background: var(--hair-soft); margin: 1px 0; }
+
+  #panelHead .title {
+    font-family: var(--serif);
+    font-style: italic;
+    font-size: 16px;
+    color: var(--value);
+  }
+  #closePanel {
+    background: none; border: none; color: var(--text-dim);
+    cursor: pointer; font-size: 15px; line-height: 1; padding: 4px;
+    font-family: var(--mono);
+  }
+  #closePanel:hover { color: var(--value); }
+
+  /* ---------------- Interaction matrix ---------------- */
+  #matrixWrap { display: flex; flex-direction: column; gap: 7px; }
+  #matrix {
+    display: grid;
+    grid-template-columns: 15px repeat(6, 1fr);
+    grid-template-rows: 15px repeat(6, 1fr);
+    gap: 3px;
+    touch-action: none;
+  }
+  .mhead {
+    width: 100%; height: 100%;
+    border-radius: 50%;
+    align-self: center; justify-self: center;
+  }
+  .mhead.dot { width: 9px; height: 9px; }
+  .mcell {
+    position: relative;
+    aspect-ratio: 1 / 1;
+    border-radius: 5px;
+    border: 1px solid var(--hair);
+    cursor: ns-resize;
+    overflow: hidden;
+    background: #0C1216;
+    transition: border-color 0.15s;
+  }
+  .mcell:hover { border-color: #2E3F49; }
+  .mcell .fill {
+    position: absolute; inset: 0;
+    border-radius: 4px;
+    pointer-events: none;
+  }
+  .mcell.diag { border-style: dashed; }
+  .mcell.active { border-color: var(--value) !important; }
+
+  /* live value badge shown while scrubbing / hovering a cell */
+  #cellBadge {
+    position: fixed;
+    z-index: 40;
+    pointer-events: none;
+    font-family: var(--mono);
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    color: var(--value);
+    background: rgba(10,14,18,0.92);
+    border: 1px solid var(--hair);
+    border-radius: 6px;
+    padding: 4px 8px;
+    transform: translate(-50%, -140%);
+    opacity: 0;
+    transition: opacity 0.14s;
+    white-space: nowrap;
+    box-shadow: 0 6px 18px -8px rgba(0,0,0,0.8);
+  }
+  #cellBadge.show { opacity: 1; }
+  #cellBadge .arrow {
+    display: inline-block; margin-right: 5px;
+  }
+
+  /* ---------------- Population + globals sliders ---------------- */
+  .scrub {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .scrub .lbl {
+    display: flex; align-items: center; justify-content: space-between;
+    font-family: var(--sans);
+    font-size: 10px;
+    letter-spacing: 0.03em;
+    color: var(--text);
+  }
+  .scrub .lbl .name { display: flex; align-items: center; gap: 7px; }
+  .scrub .lbl .swatch { width: 8px; height: 8px; border-radius: 50%; }
+  .scrub .lbl .num {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--value);
+    font-variant-numeric: tabular-nums;
+  }
+  .track {
+    position: relative;
+    height: 4px;
+    border-radius: 3px;
+    background: #0C1216;
+    border: 1px solid var(--hair-soft);
+    cursor: ew-resize;
+    touch-action: none;
+  }
+  .track .bar {
+    position: absolute;
+    top: 0; left: 0; bottom: 0;
+    border-radius: 3px;
+    background: linear-gradient(90deg, rgba(79,209,197,0.35), rgba(79,209,197,0.75));
+    pointer-events: none;
+  }
+  .track .knob {
+    position: absolute;
+    top: 50%; transform: translate(-50%, -50%);
+    width: 10px; height: 10px; border-radius: 50%;
+    background: var(--value);
+    box-shadow: 0 0 0 3px rgba(10,14,18,0.9);
+    pointer-events: none;
+  }
+
+  .pops { display: flex; flex-direction: column; gap: 8px; }
+  .globals { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px; }
+
+  /* ---------------- Toggle switch ---------------- */
+  .toggle-row { margin-top: 12px; }
+  .switch {
+    position: relative;
+    width: 34px; height: 18px;
+    border-radius: 20px;
+    background: #0C1216;
+    border: 1px solid var(--hair-soft);
+    cursor: pointer; padding: 0;
+    transition: background 0.25s, border-color 0.25s;
+    flex: none;
+  }
+  .switch .dot {
+    position: absolute; top: 50%; left: 3px;
+    transform: translateY(-50%);
+    width: 12px; height: 12px; border-radius: 50%;
+    background: var(--text-dim);
+    transition: transform 0.28s cubic-bezier(.34,1.56,.5,1), background 0.25s;
+  }
+  .switch.on {
+    background: rgba(79,209,197,0.16);
+    border-color: rgba(79,209,197,0.42);
+  }
+  .switch.on .dot {
+    transform: translate(16px, -50%);
+    background: #4FD1C5;
+    box-shadow: 0 0 8px rgba(79,209,197,0.6);
+  }
+
+  /* ---------------- Buttons ---------------- */
+  .btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  button.act {
+    font-family: var(--sans);
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--value);
+    background: rgba(30,42,50,0.35);
+    border: 1px solid var(--hair);
+    border-radius: 8px;
+    padding: 9px 8px;
+    cursor: pointer;
+    transition: background 0.18s, border-color 0.18s, color 0.18s;
+    user-select: none;
+  }
+  button.act:hover { background: rgba(79,209,197,0.12); border-color: #2E4A50; color: #EAF4F6; }
+  button.act:active { transform: translateY(1px); }
+  button.act.primary {
+    grid-column: 1 / -1;
+    background: rgba(79,209,197,0.14);
+    border-color: rgba(79,209,197,0.35);
+    color: #CFF6F1;
+  }
+  button.act.primary:hover { background: rgba(79,209,197,0.22); }
+
+  /* ---------------- Seed library ---------------- */
+  .seeds { display: flex; flex-wrap: wrap; gap: 6px; }
+  .seed {
+    font-family: var(--sans);
+    font-size: 9.5px;
+    letter-spacing: 0.04em;
+    color: var(--text);
+    background: rgba(12,18,22,0.6);
+    border: 1px solid var(--hair-soft);
+    border-radius: 20px;
+    padding: 6px 11px;
+    cursor: pointer;
+    transition: all 0.16s;
+    user-select: none;
+  }
+  .seed:hover { color: var(--value); border-color: var(--hair); background: rgba(30,42,50,0.4); }
+  .seed.on { color: #CFF6F1; border-color: rgba(79,209,197,0.4); background: rgba(79,209,197,0.1); }
+
+  /* ---------------- About overlay ---------------- */
+  #aboutBtn {
+    position: fixed;
+    bottom: 20px;
+    left: 26px;
+    z-index: 6;
+    font-family: var(--sans);
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    cursor: pointer;
+    user-select: none;
+    transition: color 0.2s;
+    background: none; border: none;
+  }
+  #aboutBtn:hover { color: var(--text); }
+
+  #about {
+    position: fixed;
+    inset: 0;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(6,9,12,0.66);
+    -webkit-backdrop-filter: blur(3px);
+    backdrop-filter: blur(3px);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s;
+  }
+  #about.show { opacity: 1; pointer-events: auto; }
+  #aboutCard {
+    position: relative;
+    width: min(520px, 88vw);
+    max-height: 86vh;
+    overflow-y: auto;
+    background: rgba(16,22,28,0.9);
+    border: 1px solid var(--hair);
+    border-radius: 16px;
+    padding: 30px 32px 26px;
+    box-shadow: 0 30px 80px -20px rgba(0,0,0,0.8);
+    transform: translateY(12px) scale(0.98);
+    transition: transform 0.32s cubic-bezier(.22,.61,.36,1);
+  }
+  #about.show #aboutCard { transform: translateY(0) scale(1); }
+  #aboutCard h1 {
+    font-family: var(--serif);
+    font-style: italic;
+    font-weight: 600;
+    font-size: 30px;
+    color: var(--value);
+    margin-bottom: 4px;
+  }
+  #aboutCard .tag {
+    font-family: var(--sans);
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    color: var(--text);
+    margin-bottom: 18px;
+    line-height: 1.5;
+  }
+  #aboutCard p {
+    font-family: var(--sans);
+    font-size: 12.5px;
+    line-height: 1.7;
+    color: var(--text);
+    margin-bottom: 12px;
+  }
+  #aboutCard p b { color: var(--value); font-weight: 600; }
+  #aboutCard .keys {
+    display: grid; grid-template-columns: auto 1fr; gap: 6px 14px;
+    font-size: 11.5px; margin: 4px 0 18px;
+  }
+  #aboutCard .keys .kb {
+    font-family: var(--mono); font-size: 10.5px;
+    color: var(--value);
+    background: rgba(12,18,22,0.7);
+    border: 1px solid var(--hair);
+    border-radius: 5px; padding: 2px 7px; justify-self: start;
+    white-space: nowrap;
+  }
+  #aboutCard .keys .kd { color: var(--text); align-self: center; }
+  #aboutCard .credit {
+    font-family: var(--sans);
+    font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--text-dim); margin-top: 6px;
+  }
+  #aboutClose {
+    position: absolute; top: 16px; right: 20px;
+    background: none; border: none; color: var(--text-dim);
+    font-family: var(--mono); font-size: 18px; cursor: pointer; padding: 4px;
+  }
+  #aboutClose:hover { color: var(--value); }
+
+  #hintFloat {
+    position: fixed;
+    left: 50%; bottom: 26px; transform: translateX(-50%);
+    z-index: 6;
+    font-family: var(--sans);
+    font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--text-dim);
+    pointer-events: none;
+    text-align: center;
+    transition: opacity 0.6s;
+    text-shadow: 0 1px 6px rgba(0,0,0,0.6);
+  }
+
+  @media (max-width: 720px) {
+    #panel { width: calc(100vw - 24px); right: 12px; bottom: 12px; max-height: 62vh; }
+    #mark .sub { display: none; }
+    #vitals { gap: 12px; }
+    #spark { width: 74px; }
+    #hintFloat { display: none; }
+  }
+</style>
+
+<canvas id="field"></canvas>
+<div id="vignette"></div>
+
+<div id="mark">
+  <div class="word">Primordia</div>
+  <div class="sub">Six species · one secret matrix</div>
+</div>
+
+<div id="vitals">
+  <div class="vital"><div class="k">FPS</div><div class="v" id="vFps">—</div></div>
+  <div class="vital"><div class="k">Particles</div><div class="v" id="vCount">—</div></div>
+  <div class="vital"><div class="k">Kinetic</div><canvas id="spark" width="216" height="60"></canvas></div>
+</div>
+
+<div id="tab" role="button" tabindex="0" aria-label="Open controls">Controls</div>
+<div id="cellBadge"><span class="arrow"></span><span class="val"></span></div>
+
+<div id="panel">
+  <div class="row" id="panelHead">
+    <div class="title">Instrument</div>
+    <button id="closePanel" title="Collapse">—</button>
+  </div>
+
+  <div class="divider"></div>
+
+  <div id="matrixWrap">
+    <div class="row">
+      <span class="section-title">Interaction Matrix</span>
+      <span class="hint">drag &#8597; · row → col</span>
+    </div>
+    <div id="matrix"></div>
+    <div class="row" style="margin-top:2px">
+      <span class="hint" style="color:var(--sp3)">warm = attract</span>
+      <span class="hint" style="color:var(--text-dim)">hollow = repel</span>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <div>
+    <div class="row" style="margin-bottom:9px">
+      <span class="section-title">Seed Library</span>
+    </div>
+    <div class="seeds" id="seeds"></div>
+  </div>
+
+  <div class="divider"></div>
+
+  <div>
+    <div class="row" style="margin-bottom:10px">
+      <span class="section-title">Population</span>
+      <span class="hint">per species · drag &#8596;</span>
+    </div>
+    <div class="pops" id="pops"></div>
+  </div>
+
+  <div class="divider"></div>
+
+  <div>
+    <div class="row" style="margin-bottom:11px">
+      <span class="section-title">Physics</span>
+    </div>
+    <div class="globals" id="globals"></div>
+    <div class="row toggle-row" id="bondToggle">
+      <span class="name" style="display:flex;align-items:center;gap:7px">
+        <span class="section-title" style="text-transform:none;letter-spacing:0.03em;font-size:10px;color:var(--text)">Living Web</span>
+      </span>
+      <button class="switch on" id="bondSwitch" role="switch" aria-checked="true" aria-label="Toggle living web"><span class="dot"></span></button>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="btns">
+    <button class="act primary" id="btnRandom">Randomize Matrix</button>
+    <button class="act" id="btnReseed">Re-seed Field</button>
+    <button class="act" id="btnClear">Clear Matrix</button>
+  </div>
+</div>
+
+<button id="aboutBtn">About</button>
+<div id="hintFloat">Hold to repel · Shift-hold to attract · scrub the matrix to rewrite the physics</div>
+
+<div id="about">
+  <div id="aboutCard">
+    <button id="aboutClose">&times;</button>
+    <h1>Primordia</h1>
+    <div class="tag">Six species, one secret matrix — watch life invent itself.</div>
+    <p>Every particle obeys one rule: a short-range shove that keeps neighbours from overlapping, blended with a mid-range pull-or-push whose sign and strength come from a single <b>6&times;6 matrix</b>. That grid is the entire genome. Warm cells attract, hollow cells repel — and because attraction can be <i>asymmetric</i> (coral chases aqua while aqua flees coral), the field spontaneously grows cells, chains, orbits and hunts.</p>
+    <p>Scrub any matrix cell and the ecosystem visibly reorganises. Hit <b>Randomize</b> and it melts and re-crystallises over a smooth morph. Nothing here is scripted — it is all emergence from numbers you can edit.</p>
+    <p>Switch on the <b>Living Web</b> and Primordia draws a glowing filament between every pair of particles caught in a mutual attraction — so the invisible bonds holding a cell or a chain together become visible in real time.</p>
+    <div class="keys">
+      <span class="kb">click + hold</span><span class="kd">gentle repulsor — stir the soup</span>
+      <span class="kb">shift + hold</span><span class="kd">attractor — gather particles</span>
+      <span class="kb">drag matrix cell</span><span class="kd">scrub attraction from &minus;1 to +1</span>
+      <span class="kb">space</span><span class="kd">pause / resume the simulation</span>
+      <span class="kb">R</span><span class="kd">randomize the matrix</span>
+      <span class="kb">B</span><span class="kd">toggle the living web of bonds</span>
+    </div>
+    <div class="credit">Built by Claude Fable 5</div>
+  </div>
+</div>
+
+<script>
+"use strict";
+(function () {
+
+  // ============================================================
+  //  Config & palette
+  // ============================================================
+  const NS = 6; // number of species
+  const COLORS = [
+    [255,107,107], // Coral
+    [255,193, 69], // Amber
+    [184,224, 98], // Chartreuse
+    [ 79,209,197], // Aqua
+    [124,140,255], // Iris
+    [229,107,240], // Magenta
+  ];
+  const COLOR_CSS = COLORS.map(c => `rgb(${c[0]},${c[1]},${c[2]})`);
+
+  const reduceMotion = window.matchMedia &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  // ------- simulation parameters (mutable via UI) -------
+  const P = {
+    rMax:      92,     // interaction radius (px, world units)
+    friction:  0.86,   // velocity retention per step (drag-to-scrub 0.5..0.98)
+    dt:        0.55,   // time-step scale
+    forceScale: 22,    // global force multiplier
+    beta:      0.30,   // repulsion zone fraction of rMax
+  };
+
+  const MAX_TOTAL = 4200;
+
+  // ============================================================
+  //  Canvas & DPR
+  // ============================================================
+  const canvas = document.getElementById("field");
+  const ctx = canvas.getContext("2d", { alpha: false });
+  let W = 0, H = 0, DPR = 1;
+
+  function resize() {
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    W = window.innerWidth;
+    H = window.innerHeight;
+    canvas.width  = Math.floor(W * DPR);
+    canvas.height = Math.floor(H * DPR);
+    canvas.style.width  = W + "px";
+    canvas.style.height = H + "px";
+    // pull any particles stranded outside the new bounds back onto the torus
+    for (let i = 0; i < N; i++) {
+      if (px[i] >= W || px[i] < 0) px[i] = ((px[i] % W) + W) % W;
+      if (py[i] >= H || py[i] < 0) py[i] = ((py[i] % H) + H) % H;
+    }
+    buildGrid();
+  }
+
+  // ============================================================
+  //  Particle state (typed arrays, SoA)
+  // ============================================================
+  let cap = MAX_TOTAL;
+  let px = new Float32Array(cap);
+  let py = new Float32Array(cap);
+  let vx = new Float32Array(cap);
+  let vy = new Float32Array(cap);
+  let sp = new Uint8Array(cap);
+  let N  = 0;
+
+  // desired population per species
+  const pop = [520, 520, 520, 520, 520, 520];
+
+  // Interaction matrix: matrix[a*NS + b] = force felt by a from b, in [-1,1]
+  const matrix     = new Float32Array(NS * NS);
+  const matrixFrom = new Float32Array(NS * NS); // morph source
+  const matrixTo   = new Float32Array(NS * NS); // morph target
+  let morphT = 1;      // 1 = settled
+  let morphDur = 700;
+  let morphStart = 0;
+
+  function idx(a, b) { return a * NS + b; }
+
+  // ============================================================
+  //  Spatial hash grid
+  // ============================================================
+  let cellSize = P.rMax;
+  let cols = 1, rows = 1;
+  let cellStart, cellCount, particleOrder;
+
+  function buildGrid() {
+    cellSize = P.rMax;
+    cols = Math.max(1, Math.ceil(W / cellSize));
+    rows = Math.max(1, Math.ceil(H / cellSize));
+    const nc = cols * rows;
+    cellStart = new Int32Array(nc + 1);
+    cellCount = new Int32Array(nc);
+    particleOrder = new Int32Array(cap);
+  }
+
+  const cellOf = new Int32Array(cap);
+
+  function rebuildBuckets() {
+    const nc = cols * rows;
+    cellCount.fill(0);
+    for (let i = 0; i < N; i++) {
+      let cx = (px[i] / cellSize) | 0;
+      let cy = (py[i] / cellSize) | 0;
+      if (cx < 0) cx = 0; else if (cx >= cols) cx = cols - 1;
+      if (cy < 0) cy = 0; else if (cy >= rows) cy = rows - 1;
+      const c = cy * cols + cx;
+      cellOf[i] = c;
+      cellCount[c]++;
+    }
+    let acc = 0;
+    for (let c = 0; c < nc; c++) {
+      cellStart[c] = acc;
+      acc += cellCount[c];
+    }
+    cellStart[nc] = acc;
+    const cursor = cellStart.slice(0, nc);
+    for (let i = 0; i < N; i++) {
+      const c = cellOf[i];
+      particleOrder[cursor[c]++] = i;
+    }
+  }
+
+  // ============================================================
+  //  Population management
+  // ============================================================
+  function reseed() {
+    // Assign counts per species clamped to global max
+    let total = 0;
+    for (let s = 0; s < NS; s++) total += pop[s];
+    if (total > MAX_TOTAL) {
+      const scale = MAX_TOTAL / total;
+      for (let s = 0; s < NS; s++) pop[s] = Math.floor(pop[s] * scale);
+      total = 0; for (let s = 0; s < NS; s++) total += pop[s];
+    }
+    N = total;
+    let k = 0;
+    for (let s = 0; s < NS; s++) {
+      for (let j = 0; j < pop[s]; j++) {
+        px[k] = Math.random() * W;
+        py[k] = Math.random() * H;
+        vx[k] = (Math.random() - 0.5) * 2;
+        vy[k] = (Math.random() - 0.5) * 2;
+        sp[k] = s;
+        k++;
+      }
+    }
+    if (particleOrder && particleOrder.length !== cap) buildGrid();
+  }
+
+  // Adjust population smoothly: add/remove particles of one species
+  function setPopulation(s, target) {
+    target = Math.max(0, Math.min(800, Math.round(target)));
+    // count current
+    let cur = 0;
+    for (let i = 0; i < N; i++) if (sp[i] === s) cur++;
+    if (target === cur) { pop[s] = target; return; }
+
+    if (target < cur) {
+      // remove (target - cur) particles of species s by compacting
+      let toRemove = cur - target;
+      let w = 0;
+      for (let i = 0; i < N; i++) {
+        if (sp[i] === s && toRemove > 0) { toRemove--; continue; }
+        if (w !== i) {
+          px[w] = px[i]; py[w] = py[i];
+          vx[w] = vx[i]; vy[w] = vy[i];
+          sp[w] = sp[i];
+        }
+        w++;
+      }
+      N = w;
+    } else {
+      let toAdd = target - cur;
+      // spawn near existing members of s (or randomly)
+      const seeds = [];
+      for (let i = 0; i < N && seeds.length < 40; i++) if (sp[i] === s) seeds.push(i);
+      while (toAdd > 0 && N < cap) {
+        let x, y;
+        if (seeds.length) {
+          const si = seeds[(Math.random() * seeds.length) | 0];
+          x = px[si] + (Math.random() - 0.5) * 60;
+          y = py[si] + (Math.random() - 0.5) * 60;
+        } else {
+          x = Math.random() * W; y = Math.random() * H;
+        }
+        px[N] = (x + W) % W; py[N] = (y + H) % H;
+        vx[N] = (Math.random() - 0.5) * 2;
+        vy[N] = (Math.random() - 0.5) * 2;
+        sp[N] = s;
+        N++; toAdd--;
+      }
+      // if the global cap stopped us short, report what actually exists
+      if (toAdd > 0) target -= toAdd;
+    }
+    pop[s] = target;
+  }
+
+  // ============================================================
+  //  Force law
+  //  f(r): universal repulsion for r < beta, signed attraction
+  //  ramp for beta < r < 1, zero beyond.  r normalized to rMax.
+  // ============================================================
+  function force(r, a) {
+    const beta = P.beta;
+    if (r < beta) {
+      return (r / beta - 1);            // -1..0 : hard short-range repulsion
+    } else if (r < 1) {
+      return a * (1 - Math.abs(2 * r - 1 - beta) / (1 - beta));
+    }
+    return 0;
+  }
+
+  // Effective matrix (morph-aware)
+  const effM = new Float32Array(NS * NS);
+  function updateEffectiveMatrix(now) {
+    if (morphT >= 1) {
+      for (let i = 0; i < NS * NS; i++) effM[i] = matrix[i];
+      return;
+    }
+    let t = (now - morphStart) / morphDur;
+    if (t >= 1) { t = 1; morphT = 1; }
+    // easeInOutCubic
+    const e = t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t+2, 3)/2;
+    for (let i = 0; i < NS * NS; i++) {
+      effM[i] = matrixFrom[i] + (matrixTo[i] - matrixFrom[i]) * e;
+      matrix[i] = effM[i];
+    }
+    if (morphT >= 1) {
+      for (let i = 0; i < NS * NS; i++) matrix[i] = matrixTo[i];
+    }
+    refreshMatrixCells();
+  }
+
+  // ============================================================
+  //  Simulation step
+  // ============================================================
+  const rMax2Base = 1;
+  let pointer = { x: -1, y: -1, active: false, attract: false };
+
+  // ---- Bond capture (the "living web") ------------------------
+  // During the force pass we record the strongest mutual attractions
+  // between nearby particles so render() can draw them as glowing
+  // filaments — making emergent chains, cells and orbits legible.
+  let showBonds = true;
+  const BOND_CAP = 6000;
+  let bondA = new Int32Array(BOND_CAP);
+  let bondB = new Int32Array(BOND_CAP);
+  let bondW = new Float32Array(BOND_CAP);   // strength 0..1
+  let bondN = 0;
+
+  function step() {
+    const rMax = P.rMax;
+    const rMax2 = rMax * rMax;
+    const fs = P.forceScale * P.dt;
+    const fric = P.friction;
+    // bonds form well inside the interaction radius, where attraction bites
+    const bondR2 = (rMax * 0.62) * (rMax * 0.62);
+    const collectBonds = showBonds && !reduceMotion;
+    bondN = 0;
+
+    rebuildBuckets();
+
+    for (let i = 0; i < N; i++) {
+      const xi = px[i], yi = py[i];
+      const si = sp[i];
+      let fxi = 0, fyi = 0;
+
+      let cx = (xi / cellSize) | 0;
+      let cy = (yi / cellSize) | 0;
+      if (cx < 0) cx = 0; else if (cx >= cols) cx = cols - 1;
+      if (cy < 0) cy = 0; else if (cy >= rows) cy = rows - 1;
+
+      for (let gy = cy - 1; gy <= cy + 1; gy++) {
+        if (gy < 0 || gy >= rows) continue;
+        for (let gx = cx - 1; gx <= cx + 1; gx++) {
+          if (gx < 0 || gx >= cols) continue;
+          const c = gy * cols + gx;
+          const s0 = cellStart[c], s1 = cellStart[c + 1];
+          for (let p = s0; p < s1; p++) {
+            const j = particleOrder[p];
+            if (j === i) continue;
+            let dx = px[j] - xi;
+            let dy = py[j] - yi;
+            const d2 = dx*dx + dy*dy;
+            if (d2 >= rMax2 || d2 === 0) continue;
+            const dist = Math.sqrt(d2);
+            const sj = sp[j];
+            const a = effM[si * NS + sj];
+            const f = force(dist / rMax, a);
+            const inv = 1 / dist;
+            fxi += (dx * inv) * f;
+            fyi += (dy * inv) * f;
+
+            // capture a bond once per pair (j>i), when both feel drawn
+            // together and they sit close inside the attractive band
+            if (collectBonds && j > i && d2 < bondR2 && bondN < BOND_CAP) {
+              const back = effM[sj * NS + si];
+              const mutual = a + back;              // -2..2
+              if (mutual > 0.35) {
+                bondA[bondN] = i;
+                bondB[bondN] = j;
+                // fade with distance and grow with mutual affinity
+                const prox = 1 - d2 / bondR2;
+                bondW[bondN] = prox * Math.min(1, mutual * 0.5);
+                bondN++;
+              }
+            }
+          }
+        }
+      }
+
+      // pointer interaction
+      if (pointer.active) {
+        let dx = pointer.x - xi;
+        let dy = pointer.y - yi;
+        const d2 = dx*dx + dy*dy;
+        const R = 150;
+        if (d2 < R*R && d2 > 0) {
+          const dist = Math.sqrt(d2);
+          const strength = (1 - dist / R);
+          const sign = pointer.attract ? 1 : -1;
+          const inv = 1 / dist;
+          fxi += (dx * inv) * strength * sign * 6;
+          fyi += (dy * inv) * strength * sign * 6;
+        }
+      }
+
+      vx[i] = (vx[i] + fxi * fs) * fric;
+      vy[i] = (vy[i] + fyi * fs) * fric;
+    }
+
+    // integrate + wrap
+    let ke = 0;
+    const dt = P.dt;
+    for (let i = 0; i < N; i++) {
+      const vxi = vx[i], vyi = vy[i];
+      ke += vxi*vxi + vyi*vyi;
+      let x = px[i] + vxi * dt;
+      let y = py[i] + vyi * dt;
+      if (x < 0) x += W; else if (x >= W) x -= W;
+      if (y < 0) y += H; else if (y >= H) y -= H;
+      px[i] = x; py[i] = y;
+    }
+    lastKE = N > 0 ? ke / N : 0;
+  }
+
+  let lastKE = 0;
+
+  // ============================================================
+  //  Sprite baking — soft radial glow per species
+  // ============================================================
+  const SPRITE = 26;      // sprite half-canvas size baseline
+  let sprites = [];
+  function bakeSprites() {
+    sprites = [];
+    const R = SPRITE;
+    for (let s = 0; s < NS; s++) {
+      const c = document.createElement("canvas");
+      c.width = R * 2; c.height = R * 2;
+      const g = c.getContext("2d");
+      const col = COLORS[s];
+      const grad = g.createRadialGradient(R, R, 0, R, R, R);
+      grad.addColorStop(0.0, `rgba(${col[0]},${col[1]},${col[2]},0.60)`);
+      grad.addColorStop(0.18, `rgba(${col[0]},${col[1]},${col[2]},0.30)`);
+      grad.addColorStop(0.45, `rgba(${col[0]},${col[1]},${col[2]},0.07)`);
+      grad.addColorStop(1.0, `rgba(${col[0]},${col[1]},${col[2]},0)`);
+      g.fillStyle = grad;
+      g.fillRect(0, 0, R * 2, R * 2);
+      sprites.push(c);
+    }
+  }
+
+  // ============================================================
+  //  Render
+  // ============================================================
+  let drawScale = 1;         // sprite draw size, world px
+  const BASE_DRAW = 9;       // visual radius of a particle glow
+  let bloom = 0;             // 0..1 boot bloom-in envelope
+
+  function render() {
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+
+    // trail fade — draw a low-alpha ink rect instead of clearing
+    if (reduceMotion) {
+      ctx.globalCompositeOperation = "source-over";
+      ctx.fillStyle = "#0A0E12";
+      ctx.fillRect(0, 0, W, H);
+    } else {
+      ctx.globalCompositeOperation = "source-over";
+      ctx.fillStyle = "rgba(10,14,18,0.42)";
+      ctx.fillRect(0, 0, W, H);
+    }
+
+    ctx.globalCompositeOperation = "lighter";
+
+    // ---- living web: glowing filaments between bonded particles ----
+    // Drawn under the particle glow, in additive mode, colour-mixed from
+    // each endpoint's species so chains read as coherent structures.
+    if (showBonds && bondN > 0 && bloom > 0.02) {
+      const seam = Math.min(W, H) * 0.5; // skip bonds that cross the wrap seam
+      ctx.lineWidth = 1;
+      for (let k = 0; k < bondN; k++) {
+        const i = bondA[k], j = bondB[k];
+        const x1 = px[i], y1 = py[i], x2 = px[j], y2 = py[j];
+        const dx = x2 - x1, dy = y2 - y1;
+        if (dx*dx + dy*dy > seam*seam) continue; // don't streak across torus
+        const ci = COLORS[sp[i]], cj = COLORS[sp[j]];
+        const r = (ci[0] + cj[0]) * 0.5 | 0;
+        const g = (ci[1] + cj[1]) * 0.5 | 0;
+        const b = (ci[2] + cj[2]) * 0.5 | 0;
+        const alpha = bondW[k] * 0.22 * bloom;
+        ctx.strokeStyle = `rgba(${r},${g},${b},${alpha})`;
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.stroke();
+      }
+    }
+
+    const half = BASE_DRAW * (0.55 + 0.45 * bloom);
+    const size = half * 2;
+    ctx.globalAlpha = 0.35 + 0.65 * bloom;
+    for (let i = 0; i < N; i++) {
+      const s = sp[i];
+      ctx.drawImage(sprites[s], px[i] - half, py[i] - half, size, size);
+    }
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = "source-over";
+
+    if (bloom < 1) bloom = Math.min(1, bloom + 0.018);
+  }
+
+  // ============================================================
+  //  Main loop: fixed-timestep integrator w/ accumulator
+  // ============================================================
+  let running = true;
+  let acc = 0;
+  let last = performance.now();
+  const STEP_MS = 1000 / 60;
+  let fpsSmooth = 60;
+  let frameCount = 0, fpsAccum = 0, fpsTimer = 0;
+
+  // KE sparkline history
+  const keHist = new Float32Array(120);
+  let keHead = 0;
+
+  function loop(now) {
+    requestAnimationFrame(loop);
+    let dtMs = now - last;
+    last = now;
+    if (dtMs > 100) dtMs = 100; // avoid spiral of death after tab-away
+
+    // FPS
+    fpsAccum += dtMs; frameCount++;
+    fpsTimer += dtMs;
+    if (fpsTimer >= 400) {
+      fpsSmooth = 1000 / (fpsAccum / frameCount);
+      vFps.textContent = Math.round(fpsSmooth);
+      fpsAccum = 0; frameCount = 0; fpsTimer = 0;
+      autoThrottle();
+    }
+
+    updateEffectiveMatrix(now);
+
+    if (running) {
+      acc += dtMs;
+      let steps = 0;
+      while (acc >= STEP_MS && steps < 4) {
+        step();
+        acc -= STEP_MS;
+        steps++;
+      }
+      // drop unpayable debt so a slow machine doesn't accrue it forever
+      if (acc > STEP_MS * 4) acc = STEP_MS * 4;
+    }
+
+    render();
+
+    // vitals
+    keHist[keHead] = lastKE;
+    keHead = (keHead + 1) % keHist.length;
+    drawSpark();
+  }
+
+  // Auto-throttle: if fps sags, trim population proportionally
+  let throttleCooldown = 0;
+  function autoThrottle() {
+    // A hidden/background tab has its rAF throttled by the browser, which
+    // reports a bogus low FPS — never trim population in that case.
+    if (typeof document !== "undefined" && document.hidden) return;
+    if (throttleCooldown > 0) { throttleCooldown--; return; }
+    if (fpsSmooth < 36 && N > 1200) {
+      const trim = Math.floor(N * 0.10);
+      N -= trim;
+      // reflect roughly in pop counts
+      recountPop();
+      throttleCooldown = 10; // wait several readouts before trimming again
+    }
+  }
+  function recountPop() {
+    const counts = new Int32Array(NS);
+    for (let i = 0; i < N; i++) counts[sp[i]]++;
+    for (let s = 0; s < NS; s++) { pop[s] = counts[s]; }
+    refreshPopUI();
+  }
+
+  // ============================================================
+  //  Sparkline
+  // ============================================================
+  const spark = document.getElementById("spark");
+  const sctx = spark.getContext("2d");
+  const vCount = document.getElementById("vCount");
+  const vFps = document.getElementById("vFps");
+
+  function drawSpark() {
+    const w = spark.width, h = spark.height;
+    sctx.clearRect(0, 0, w, h);
+    // find max in history for autoscale
+    let mx = 1e-6;
+    for (let i = 0; i < keHist.length; i++) if (keHist[i] > mx) mx = keHist[i];
+    sctx.beginPath();
+    const n = keHist.length;
+    for (let i = 0; i < n; i++) {
+      const ii = (keHead + i) % n;
+      const v = keHist[ii] / mx;
+      const x = (i / (n - 1)) * (w - 2) + 1;
+      const y = h - 2 - v * (h - 6);
+      if (i === 0) sctx.moveTo(x, y); else sctx.lineTo(x, y);
+    }
+    sctx.strokeStyle = "rgba(79,209,197,0.85)";
+    sctx.lineWidth = 2;
+    sctx.lineJoin = "round";
+    sctx.stroke();
+    // fill under
+    sctx.lineTo(w - 1, h);
+    sctx.lineTo(1, h);
+    sctx.closePath();
+    const grad = sctx.createLinearGradient(0, 0, 0, h);
+    grad.addColorStop(0, "rgba(79,209,197,0.22)");
+    grad.addColorStop(1, "rgba(79,209,197,0)");
+    sctx.fillStyle = grad;
+    sctx.fill();
+
+    vCount.textContent = N.toLocaleString();
+  }
+
+  // ============================================================
+  //  Matrix presets & randomization
+  // ============================================================
+  function randMatrix(target) {
+    for (let a = 0; a < NS; a++)
+      for (let b = 0; b < NS; b++)
+        target[idx(a,b)] = Math.round((Math.random() * 2 - 1) * 100) / 100;
+  }
+
+  function commitMorph(target, dur) {
+    // set from = current effective, to = target
+    for (let i = 0; i < NS * NS; i++) {
+      matrixFrom[i] = matrix[i];
+      matrixTo[i] = target[i];
+    }
+    morphDur = reduceMotion ? 1 : (dur || 700);
+    morphStart = performance.now();
+    morphT = 0;
+    if (reduceMotion) {
+      for (let i = 0; i < NS * NS; i++) matrix[i] = target[i];
+      morphT = 1;
+      refreshMatrixCells();
+    }
+  }
+
+  // Seed presets — each a full 6x6 (row a feels col b)
+  const PRESETS = {
+    "Cell Division": (() => {
+      const m = new Float32Array(NS*NS);
+      for (let a=0;a<NS;a++) for (let b=0;b<NS;b++)
+        m[idx(a,b)] = (a===b) ? 0.9 : -0.2;
+      return m;
+    })(),
+    "Orbital Chains": (() => {
+      const m = new Float32Array(NS*NS);
+      for (let a=0;a<NS;a++) for (let b=0;b<NS;b++) {
+        if (b === (a+1)%NS) m[idx(a,b)] = 0.9;
+        else if (a === (b+1)%NS) m[idx(a,b)] = -0.6;
+        else m[idx(a,b)] = a===b ? 0.15 : -0.05;
+      }
+      return m;
+    })(),
+    "Snake": (() => {
+      const m = new Float32Array(NS*NS);
+      for (let a=0;a<NS;a++) for (let b=0;b<NS;b++) {
+        if (b === (a+1)%NS) m[idx(a,b)] = 1.0;      // chase next
+        else if (a === b)   m[idx(a,b)] = -0.35;    // self-avoid
+        else                m[idx(a,b)] = -0.1;
+      }
+      return m;
+    })(),
+    "Predator Swarm": (() => {
+      const m = new Float32Array(NS*NS);
+      for (let a=0;a<NS;a++) for (let b=0;b<NS;b++) {
+        if (a===0) m[idx(a,b)] = b===0 ? 0.5 : 0.9;   // predator chases all
+        else if (b===0) m[idx(a,b)] = -1.0;           // prey flees predator
+        else m[idx(a,b)] = a===b ? 0.6 : 0.1;         // prey flocks
+      }
+      return m;
+    })(),
+    "Crystalline": (() => {
+      const m = new Float32Array(NS*NS);
+      for (let a=0;a<NS;a++) for (let b=0;b<NS;b++) {
+        const d = Math.abs(a-b);
+        m[idx(a,b)] = d===0 ? -0.4 : (d===1 ? 0.95 : -0.15);
+      }
+      return m;
+    })(),
+  };
+  const PRESET_NAMES = Object.keys(PRESETS);
+
+  // ============================================================
+  //  Build matrix UI
+  // ============================================================
+  const matrixEl = document.getElementById("matrix");
+  const cellEls = []; // 36
+  function buildMatrixUI() {
+    matrixEl.innerHTML = "";
+    cellEls.length = 0;
+    // top-left corner blank
+    const corner = document.createElement("div");
+    matrixEl.appendChild(corner);
+    // column headers
+    for (let b = 0; b < NS; b++) {
+      const h = document.createElement("div");
+      h.className = "mhead dot";
+      h.style.background = COLOR_CSS[b];
+      h.style.boxShadow = `0 0 6px ${COLOR_CSS[b]}`;
+      matrixEl.appendChild(h);
+    }
+    for (let a = 0; a < NS; a++) {
+      // row header
+      const rh = document.createElement("div");
+      rh.className = "mhead dot";
+      rh.style.background = COLOR_CSS[a];
+      rh.style.boxShadow = `0 0 6px ${COLOR_CSS[a]}`;
+      matrixEl.appendChild(rh);
+      for (let b = 0; b < NS; b++) {
+        const cell = document.createElement("div");
+        cell.className = "mcell" + (a === b ? " diag" : "");
+        cell.dataset.a = a; cell.dataset.b = b;
+        const fill = document.createElement("div");
+        fill.className = "fill";
+        cell.appendChild(fill);
+        matrixEl.appendChild(cell);
+        cellEls[idx(a,b)] = cell;
+        attachCellScrub(cell, a, b);
+      }
+    }
+    refreshMatrixCells();
+  }
+
+  function cellColor(v) {
+    // warm attraction -> amber/coral glow; repulsion -> cool hollow
+    if (v > 0) {
+      const t = Math.min(1, v);
+      // warm fill (amber->coral) with opacity by strength
+      const r = 255, g = Math.round(150 - t*40), b = Math.round(90 - t*40);
+      return { bg: `rgba(${r},${g},${b},${0.14 + t*0.66})`, border: null };
+    } else if (v < 0) {
+      const t = Math.min(1, -v);
+      // cool hollow — faint teal ring, dark centre
+      return {
+        bg: `radial-gradient(circle at 50% 50%, rgba(79,209,197,0) ${38 - t*22}%, rgba(79,209,197,${0.10 + t*0.30}) 100%)`,
+        border: null
+      };
+    }
+    return { bg: "transparent", border: null };
+  }
+
+  function refreshMatrixCells() {
+    for (let a = 0; a < NS; a++)
+      for (let b = 0; b < NS; b++) {
+        const cell = cellEls[idx(a,b)];
+        if (!cell) continue;
+        const fill = cell.firstChild;
+        const v = matrix[idx(a,b)];
+        const c = cellColor(v);
+        fill.style.background = c.bg;
+      }
+  }
+
+  // Live value badge (shared across cells)
+  const cellBadge = document.getElementById("cellBadge");
+  const badgeArrow = cellBadge.querySelector(".arrow");
+  const badgeVal = cellBadge.querySelector(".val");
+  function showBadge(a, b, clientX, clientY) {
+    const v = matrix[idx(a,b)];
+    const sign = v > 0.001 ? "+" : (v < -0.001 ? "−" : "·");
+    badgeArrow.innerHTML =
+      `<span style="color:${COLOR_CSS[a]}">●</span>` +
+      `<span style="opacity:.5"> → </span>` +
+      `<span style="color:${COLOR_CSS[b]}">●</span>&nbsp;`;
+    badgeVal.textContent = (v === 0 ? "0.00" : sign + Math.abs(v).toFixed(2));
+    badgeVal.style.color = v >= 0 ? "#FFC79A" : "#7FE6DC";
+    cellBadge.style.left = clientX + "px";
+    cellBadge.style.top = clientY + "px";
+    cellBadge.classList.add("show");
+  }
+  function hideBadge() { cellBadge.classList.remove("show"); }
+
+  // vertical drag to scrub a cell value
+  function attachCellScrub(cell, a, b) {
+    let dragging = false, startY = 0, startV = 0;
+    cell.addEventListener("pointerdown", (e) => {
+      dragging = true;
+      startY = e.clientY;
+      startV = matrix[idx(a,b)];
+      cell.classList.add("active");
+      try { cell.setPointerCapture(e.pointerId); } catch (_) {}
+      // cancel any morph so manual edit sticks
+      morphT = 1;
+      clearSeedSelection();
+      const r = cell.getBoundingClientRect();
+      showBadge(a, b, r.left + r.width / 2, r.top);
+      e.preventDefault();
+    });
+    cell.addEventListener("pointermove", (e) => {
+      if (!dragging) return;
+      const dy = startY - e.clientY;
+      let v = startV + dy / 120; // 120px full-ish range feel
+      v = Math.max(-1, Math.min(1, v));
+      matrix[idx(a,b)] = Math.round(v * 100) / 100;
+      const fill = cell.firstChild;
+      fill.style.background = cellColor(matrix[idx(a,b)]).bg;
+      const r = cell.getBoundingClientRect();
+      showBadge(a, b, r.left + r.width / 2, r.top);
+    });
+    // hover preview (desktop) without dragging
+    cell.addEventListener("pointerenter", (e) => {
+      if (dragging || e.pointerType === "touch") return;
+      const r = cell.getBoundingClientRect();
+      showBadge(a, b, r.left + r.width / 2, r.top);
+    });
+    cell.addEventListener("pointerleave", () => { if (!dragging) hideBadge(); });
+    const end = () => {
+      if (!dragging) return;
+      dragging = false;
+      cell.classList.remove("active");
+      hideBadge();
+    };
+    cell.addEventListener("pointerup", end);
+    cell.addEventListener("pointercancel", end);
+  }
+
+  // ============================================================
+  //  Population UI
+  // ============================================================
+  const popsEl = document.getElementById("pops");
+  const popNumEls = [];
+  const popBarEls = [];
+  const popKnobEls = [];
+  function buildPopUI() {
+    popsEl.innerHTML = "";
+    for (let s = 0; s < NS; s++) {
+      const wrap = document.createElement("div");
+      wrap.className = "scrub";
+      wrap.innerHTML = `
+        <div class="lbl">
+          <span class="name"><span class="swatch" style="background:${COLOR_CSS[s]};box-shadow:0 0 6px ${COLOR_CSS[s]}"></span>Species ${s+1}</span>
+          <span class="num"></span>
+        </div>
+        <div class="track"><div class="bar"></div><div class="knob"></div></div>`;
+      popsEl.appendChild(wrap);
+      const num = wrap.querySelector(".num");
+      const bar = wrap.querySelector(".bar");
+      const knob = wrap.querySelector(".knob");
+      const track = wrap.querySelector(".track");
+      popNumEls[s] = num; popBarEls[s] = bar; popKnobEls[s] = knob;
+      attachTrackScrub(track, () => pop[s] / 800, (frac) => {
+        setPopulation(s, frac * 800);
+        refreshPopUI();
+      });
+    }
+    refreshPopUI();
+  }
+  function refreshPopUI() {
+    for (let s = 0; s < NS; s++) {
+      if (!popNumEls[s]) continue;
+      const frac = Math.max(0, Math.min(1, pop[s] / 800));
+      popNumEls[s].textContent = pop[s];
+      popBarEls[s].style.width = (frac * 100) + "%";
+      popBarEls[s].style.background =
+        `linear-gradient(90deg, ${hexA(s,0.3)}, ${COLOR_CSS[s]})`;
+      popKnobEls[s].style.left = (frac * 100) + "%";
+    }
+  }
+  function hexA(s, a) {
+    const c = COLORS[s]; return `rgba(${c[0]},${c[1]},${c[2]},${a})`;
+  }
+
+  // ============================================================
+  //  Global physics UI
+  // ============================================================
+  const globalsEl = document.getElementById("globals");
+  const GLOBAL_DEFS = [
+    { key: "rMax",       label: "Force Radius", min: 40,  max: 160, fmt: v => Math.round(v), onChange: () => buildGrid() },
+    { key: "friction",   label: "Friction",     min: 0.60, max: 0.97, fmt: v => v.toFixed(2) },
+    { key: "dt",         label: "Time-step",    min: 0.15, max: 0.9, fmt: v => v.toFixed(2) },
+    { key: "forceScale", label: "Force",        min: 6,   max: 40,  fmt: v => Math.round(v) },
+  ];
+  const globalNumEls = {}, globalBarEls = {}, globalKnobEls = {};
+  function buildGlobalsUI() {
+    globalsEl.innerHTML = "";
+    GLOBAL_DEFS.forEach(def => {
+      const wrap = document.createElement("div");
+      wrap.className = "scrub";
+      wrap.innerHTML = `
+        <div class="lbl"><span class="name">${def.label}</span><span class="num"></span></div>
+        <div class="track"><div class="bar"></div><div class="knob"></div></div>`;
+      globalsEl.appendChild(wrap);
+      globalNumEls[def.key] = wrap.querySelector(".num");
+      globalBarEls[def.key] = wrap.querySelector(".bar");
+      globalKnobEls[def.key] = wrap.querySelector(".knob");
+      const track = wrap.querySelector(".track");
+      attachTrackScrub(track,
+        () => (P[def.key] - def.min) / (def.max - def.min),
+        (frac) => {
+          P[def.key] = def.min + frac * (def.max - def.min);
+          if (def.onChange) def.onChange();
+          refreshGlobalsUI();
+        });
+    });
+    refreshGlobalsUI();
+  }
+  function refreshGlobalsUI() {
+    GLOBAL_DEFS.forEach(def => {
+      const frac = Math.max(0, Math.min(1, (P[def.key] - def.min) / (def.max - def.min)));
+      globalNumEls[def.key].textContent = def.fmt(P[def.key]);
+      globalBarEls[def.key].style.width = (frac * 100) + "%";
+      globalKnobEls[def.key].style.left = (frac * 100) + "%";
+    });
+  }
+
+  // ============================================================
+  //  Generic horizontal track scrub
+  // ============================================================
+  function attachTrackScrub(track, getFrac, setFrac) {
+    let dragging = false;
+    function apply(e) {
+      const rect = track.getBoundingClientRect();
+      let frac = (e.clientX - rect.left) / rect.width;
+      frac = Math.max(0, Math.min(1, frac));
+      setFrac(frac);
+    }
+    track.addEventListener("pointerdown", (e) => {
+      dragging = true;
+      try { track.setPointerCapture(e.pointerId); } catch (_) {}
+      apply(e);
+      e.preventDefault();
+    });
+    track.addEventListener("pointermove", (e) => { if (dragging) apply(e); });
+    const end = (e) => { dragging = false; };
+    track.addEventListener("pointerup", end);
+    track.addEventListener("pointercancel", end);
+  }
+
+  // ============================================================
+  //  Seed library UI
+  // ============================================================
+  const seedsEl = document.getElementById("seeds");
+  const seedBtns = [];
+  function buildSeedsUI() {
+    seedsEl.innerHTML = "";
+    seedBtns.length = 0;
+    PRESET_NAMES.forEach(name => {
+      const b = document.createElement("div");
+      b.className = "seed";
+      b.textContent = name;
+      b.addEventListener("click", () => {
+        commitMorph(PRESETS[name], 700);
+        clearSeedSelection();
+        b.classList.add("on");
+      });
+      seedsEl.appendChild(b);
+      seedBtns.push(b);
+    });
+  }
+  function clearSeedSelection() {
+    seedBtns.forEach(b => b.classList.remove("on"));
+  }
+
+  // ============================================================
+  //  Buttons & panel toggles
+  // ============================================================
+  document.getElementById("btnRandom").addEventListener("click", () => {
+    const t = new Float32Array(NS*NS);
+    randMatrix(t);
+    commitMorph(t, 700);
+    clearSeedSelection();
+  });
+  document.getElementById("btnReseed").addEventListener("click", () => { reseed(); bloom = 0; });
+
+  const bondSwitch = document.getElementById("bondSwitch");
+  bondSwitch.addEventListener("click", () => {
+    showBonds = !showBonds;
+    bondSwitch.classList.toggle("on", showBonds);
+    bondSwitch.setAttribute("aria-checked", showBonds ? "true" : "false");
+  });
+  document.getElementById("btnClear").addEventListener("click", () => {
+    const t = new Float32Array(NS*NS); // all zero
+    commitMorph(t, 500);
+    clearSeedSelection();
+  });
+
+  const tab = document.getElementById("tab");
+  const closePanel = document.getElementById("closePanel");
+  closePanel.addEventListener("click", () => document.body.classList.add("panel-collapsed"));
+  tab.addEventListener("click", () => document.body.classList.remove("panel-collapsed"));
+  tab.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      document.body.classList.remove("panel-collapsed");
+      e.preventDefault();
+    }
+  });
+
+  // About overlay
+  const about = document.getElementById("about");
+  document.getElementById("aboutBtn").addEventListener("click", () => about.classList.add("show"));
+  document.getElementById("aboutClose").addEventListener("click", () => about.classList.remove("show"));
+  about.addEventListener("click", (e) => { if (e.target === about) about.classList.remove("show"); });
+
+  // ============================================================
+  //  Pointer interaction on field
+  // ============================================================
+  function fieldPointer(e) {
+    pointer.x = e.clientX;
+    pointer.y = e.clientY;
+  }
+  canvas.addEventListener("pointerdown", (e) => {
+    pointer.active = true;
+    pointer.attract = e.shiftKey;
+    fieldPointer(e);
+    try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
+    hideFloatHint();
+  });
+  canvas.addEventListener("pointermove", (e) => { if (pointer.active) fieldPointer(e); });
+  const releasePointer = () => { pointer.active = false; };
+  canvas.addEventListener("pointerup", releasePointer);
+  canvas.addEventListener("pointercancel", releasePointer);
+  window.addEventListener("pointerup", releasePointer);
+  window.addEventListener("blur", releasePointer);
+
+  // ============================================================
+  //  Keyboard
+  // ============================================================
+  window.addEventListener("keydown", (e) => {
+    // let a focused button handle Space/Enter itself (a11y)
+    const tag = e.target && e.target.tagName;
+    if (tag === "BUTTON" && (e.key === " " || e.key === "Enter")) return;
+    if (e.key === " ") { running = !running; e.preventDefault(); }
+    else if (e.key === "r" || e.key === "R") {
+      const t = new Float32Array(NS*NS); randMatrix(t); commitMorph(t, 700); clearSeedSelection();
+    }
+    else if (e.key === "b" || e.key === "B") {
+      showBonds = !showBonds;
+      bondSwitch.classList.toggle("on", showBonds);
+      bondSwitch.setAttribute("aria-checked", showBonds ? "true" : "false");
+    }
+    else if (e.key === "Shift") { if (pointer.active) pointer.attract = true; }
+    else if (e.key === "Escape") { about.classList.remove("show"); }
+  });
+  window.addEventListener("keyup", (e) => {
+    if (e.key === "Shift" && pointer.active) pointer.attract = false;
+  });
+
+  // hint auto-hide
+  const hintFloat = document.getElementById("hintFloat");
+  let hintTimer = setTimeout(hideFloatHint, 7000);
+  function hideFloatHint() {
+    hintFloat.style.opacity = "0";
+    clearTimeout(hintTimer);
+  }
+
+  // ============================================================
+  //  Resize handling
+  // ============================================================
+  let resizeRAF = 0;
+  const ro = new ResizeObserver(() => {
+    cancelAnimationFrame(resizeRAF);
+    resizeRAF = requestAnimationFrame(resize);
+  });
+  ro.observe(document.body);
+  window.addEventListener("resize", () => {
+    cancelAnimationFrame(resizeRAF);
+    resizeRAF = requestAnimationFrame(resize);
+  });
+
+  // ============================================================
+  //  Boot
+  // ============================================================
+  function boot() {
+    resize();
+    bakeSprites();
+    // default matrix: a curated, lively preset so first load is beautiful
+    commitMorph(PRESETS["Orbital Chains"], 1);
+    morphT = 1;
+    for (let i = 0; i < NS*NS; i++) matrix[i] = PRESETS["Orbital Chains"][i];
+    reseed();
+    buildMatrixUI();
+    buildSeedsUI();
+    buildPopUI();
+    buildGlobalsUI();
+    // mark the default seed
+    const oi = PRESET_NAMES.indexOf("Orbital Chains");
+    if (oi >= 0) seedBtns[oi].classList.add("on");
+    // paint one ink frame
+    ctx.setTransform(DPR,0,0,DPR,0,0);
+    ctx.fillStyle = "#0A0E12"; ctx.fillRect(0,0,W,H);
+    requestAnimationFrame(loop);
+  }
+
+  try {
+    boot();
+  } catch (err) {
+    console.error("Primordia failed to start:", err);
+    document.body.innerHTML =
+      '<div style="color:#8FA0A8;font-family:sans-serif;padding:40px;font-size:14px">' +
+      'Primordia could not start in this browser. ' + (err && err.message) + '</div>';
+  }
+
+})();
+</script>
