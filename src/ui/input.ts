@@ -71,6 +71,10 @@ export class CanvasInput {
   private down = (e: PointerEvent) => {
     if (e.pointerType === 'mouse' && e.button !== 0 && e.button !== 2) return;
     e.preventDefault();
+    // preventDefault keeps focus where it was (e.g. on a gallery card) – hand it back to the page
+    // so keyboard shortcuts such as ←/→ work again after touching the canvas
+    const active = document.activeElement;
+    if (active instanceof HTMLElement && active !== document.body) active.blur();
     try {
       this.canvas.setPointerCapture(e.pointerId);
     } catch {

@@ -50,21 +50,22 @@ export class Toolbar {
       const b = h('button', { type: 'button', class: 'tb-pop__item', role: 'menuitemradio', 'aria-checked': 'false' }, icon(t.icon), h('span', null, t.label), h('small', null, t.hint));
       b.addEventListener('click', () => {
         app.updateSettings({ tool: t.id });
-        if (t.id !== 'spawn') this.togglePop(false);
+        // close for every tool – for „Přidávat“ the species picker then shows above the toolbar
+        this.togglePop(false);
       });
       this.pop.append(b);
       this.popBtns.push(b);
     }
     this.speciesPop = h('div', { class: 'species-pick', role: 'group', 'aria-label': 'Jaký druh přidávat' });
     document.addEventListener('pointerdown', (e) => {
-      if (!this.pop.hidden && !this.pop.contains(e.target as Node) && e.target !== this.current) this.togglePop(false);
+      if (!this.pop.hidden && !this.pop.contains(e.target as Node) && !this.current.contains(e.target as Node)) this.togglePop(false);
     });
 
     const dice = this.iconBtn('dice', 'Náhodná matice', 'R', () => {
       sfx.whoosh();
       app.randomize();
     });
-    const mutate = this.iconBtn('mutate', 'Zmutovat matici', 'M', () => {
+    const mutate = this.iconBtn('mutate', 'Zmutovat matici', 'Z', () => {
       sfx.flip();
       app.mutate();
     });
@@ -74,6 +75,8 @@ export class Toolbar {
     });
     reseed.classList.add('tb--reseed');
     mutate.classList.add('tb--mutate');
+    const zen = this.iconBtn('eyeOff', 'Skrýt rozhraní – jen plátno', 'H', () => app.store.set({ zen: true }));
+    zen.classList.add('tb--zen');
     this.panelBtn = this.iconBtn('sliders', 'Laboratoř', 'L', () => app.store.set({ panelOpen: !app.store.state.panelOpen }));
     this.panelBtn.classList.add('tb--panel');
     this.panelBtn.setAttribute('aria-controls', 'panel');
@@ -91,6 +94,7 @@ export class Toolbar {
       mutate,
       reseed,
       h('span', { class: 'tb-sep' }),
+      zen,
       this.panelBtn,
       this.pop,
       this.speciesPop,

@@ -27,7 +27,6 @@ export class SimClient {
           e.preventDefault();
           this.fallback(e.message || 'Worker selhal');
         };
-        this.startHelpers();
       } catch {
         this.worker = null;
       }
@@ -39,6 +38,18 @@ export class SimClient {
   /** Number of helper threads available for the force pass. */
   get helperCount(): number {
     return this.helpers.length;
+  }
+
+  private helpersStarted = false;
+
+  /**
+   * Start the helper workers for the parallel force pass. Called lazily once the world is big
+   * enough to benefit (small phone worlds never spawn them).
+   */
+  enableHelpers(): void {
+    if (this.helpersStarted || !this.worker) return;
+    this.helpersStarted = true;
+    this.startHelpers();
   }
 
   private startHelpers(): void {

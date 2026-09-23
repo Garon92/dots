@@ -25,15 +25,16 @@ export async function shareWorld(app: App): Promise<void> {
   }
 }
 
-/** Save the canvas as PNG (share sheet on phones so it can go to the photo library). */
+/** Save the canvas as a JPEG (share sheet on phones so it can go to the photo library). */
 export async function saveScreenshot(app: App, stage: HTMLElement): Promise<void> {
-  const c = app.captureCanvas();
+  // JPEG capped at 2560 px: a full-resolution PNG of the glow was ~10 MB – too big for messengers
+  const c = app.captureCanvas(2560);
   const title = (app.store.state.title || 'dots').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
   const d = new Date();
   const p2 = (n: number) => String(n).padStart(2, '0');
   const stamp = `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}-${p2(d.getHours())}${p2(d.getMinutes())}`;
-  const name = `dots-${title || 'svet'}-${stamp}.png`;
-  const blob = await new Promise<Blob | null>((res) => c.toBlob(res, 'image/png'));
+  const name = `dots-${title || 'svet'}-${stamp}.jpg`;
+  const blob = await new Promise<Blob | null>((res) => c.toBlob(res, 'image/jpeg', 0.9));
   if (!blob) {
     toast('Obrázek se nepodařilo vytvořit.', { variant: 'danger' });
     return;
@@ -42,7 +43,7 @@ export async function saveScreenshot(app: App, stage: HTMLElement): Promise<void
   stage.classList.remove('flash');
   void stage.offsetWidth;
   stage.classList.add('flash');
-  const file = new File([blob], name, { type: 'image/png' });
+  const file = new File([blob], name, { type: 'image/jpeg' });
   const coarse = matchMedia('(pointer: coarse)').matches;
   if (coarse && navigator.canShare?.({ files: [file] })) {
     try {

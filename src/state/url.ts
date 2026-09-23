@@ -86,31 +86,59 @@ export interface HashState {
   recipe?: Recipe;
   presetId?: string;
   name?: string;
+  /**
+   * Particle density relative to the default of the sender's screen (1 = default). Lets the
+   * receiver reproduce the same look on a screen of any size instead of copying absolute counts.
+   */
+  density?: number;
+  /** The hash asked for a world (`w=` / `p=`) but it could not be read. */
+  broken?: boolean;
 }
 
-/** Parse `#w=…&n=…` (custom world) or `#p=presetId`. */
+const DENSITY_MIN = 0.05;
+const DENSITY_MAX = 8;
+
+/** Parse `#w=…&n=…&d=…` (custom world) or `#p=presetId`. */
 export function parseHash(hash: string, fallback: Recipe): HashState {
   const h = hash.replace(/^#/, '');
   if (!h) return {};
-  const params = new URLSearchParams(h);
+  let params: URLSearchParams;
+  try {
+    params = new URLSearchParams(h);
+  } catch {
+    return { broken: true };
+  }
   const out: HashState = {};
   const w = params.get('w');
-  if (w) {
-    const r = decodeRecipe(w, fallback);
-    if (r) out.recipe = r;
-  }
   const p = params.get('p');
-  if (p && /^[a-z0-9-]{1,40}$/.test(p)) out.presetId = p;
+  if (w !== null) {
+    const r = w.length <= 400 ? decodeRecipe(w, fallback) : null;
+    if (r) out.recipe = r;
+    else out.broken = true;
+  } else if (p !== null) {
+    if (/^[a-z0-9-]{1,40}$/.test(p)) out.presetId = p;
+    else out.broken = true;
+  }
   const n = params.get('n');
-  if (n) out.name = n.slice(0, 40);
+  if (n && out.recipe) out.name = n.slice(0, 40);
+  const d = Number(params.get('d'));
+  if (out.recipe && params.has('d') && Number.isFinite(d) && d > 0) {
+    out.density = Math.min(DENSITY_MAX, Math.max(DENSITY_MIN, d));
+  }
   return out;
 }
 
 export function buildHash(state: HashState): string {
   const params = new URLSearchParams();
-  if (state.recipe) params.set('w', encodeRecipe(state.recipe));
-  else if (state.presetId) params.set('p', state.presetId);
-  if (state.name) params.set('n', state.name.slice(0, 40));
+  if (state.recipe) {
+    params.set('w', encodeRecipe(state.recipe));
+    if (state.density !== undefined && Number.isFinite(state.density)) {
+      params.set('d', String(Math.round(Math.min(DENSITY_MAX, Math.max(DENSITY_MIN, state.density)) * 100) / 100));
+    }
+    if (state.name) params.set('n', state.name.slice(0, 40));
+  } else if (state.presetId) {
+    params.set('p', state.presetId);
+  }
   const s = params.toString();
   return s ? `#${s}` : '';
 }

@@ -40,7 +40,12 @@ export function svg(markup: string): SVGSVGElement {
   return t.content.firstElementChild as SVGSVGElement;
 }
 
-export const fmtInt = (n: number): string => Math.round(n).toLocaleString('cs-CZ');
+/** 12 345 with a narrow no-break space (like cs-CZ; avoids the costly first Intl call at boot). */
+export const fmtInt = (n: number): string => {
+  const v = Math.round(n);
+  const s = String(Math.abs(v)).replace(/\B(?=(\d{3})+(?!\d))/g, '\u00a0');
+  return v < 0 ? `−${s}` : s;
+};
 export const fmtNum = (n: number, digits = 2): string => n.toFixed(digits).replace('.', ',');
 export const fmtSigned = (n: number): string => (n > 0.004 ? '+' : n < -0.004 ? '−' : '') + Math.abs(n).toFixed(2).replace('.', ',');
 

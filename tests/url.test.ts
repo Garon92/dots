@@ -72,11 +72,28 @@ describe('URL state', () => {
   it('parses and builds hashes', () => {
     expect(parseHash('', fallback)).toEqual({});
     expect(parseHash('#p=bunky', fallback)).toEqual({ presetId: 'bunky' });
-    expect(parseHash('#p=../../evil', fallback)).toEqual({});
+    expect(parseHash('#p=../../evil', fallback)).toEqual({ broken: true });
     const h = buildHash({ recipe: sample, name: 'Moje buňky ✨' });
     const back = parseHash(h, fallback);
     expect(back.recipe).toEqual(sample);
     expect(back.name).toBe('Moje buňky ✨');
     expect(buildHash({ presetId: 'hadi' })).toBe('#p=hadi');
+  });
+
+  it('carries the relative density so a link looks the same on any screen', () => {
+    const h = buildHash({ recipe: sample, density: 1.2345 });
+    expect(h).toContain('d=1.23');
+    expect(parseHash(h, fallback).density).toBe(1.23);
+    expect(parseHash(buildHash({ recipe: sample }), fallback).density).toBeUndefined();
+    expect(parseHash(`${buildHash({ recipe: sample })}&d=999`, fallback).density).toBe(8);
+    expect(parseHash(`${buildHash({ recipe: sample })}&d=abc`, fallback).density).toBeUndefined();
+  });
+
+  it('flags links that asked for a world but cannot be read', () => {
+    expect(parseHash('#w=%%%garbage', fallback).broken).toBe(true);
+    expect(parseHash('#w=AQMAAAA', fallback).broken).toBe(true);
+    expect(parseHash(`#w=${'A'.repeat(600)}`, fallback).broken).toBe(true);
+    expect(parseHash('#w=', fallback).broken).toBe(true);
+    expect(parseHash('#nic=1', fallback).broken).toBeUndefined();
   });
 });

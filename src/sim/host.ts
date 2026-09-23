@@ -4,7 +4,7 @@ import { mulberry32, type Rng } from './rng';
 import { BOND_STRIDE, World } from './world';
 
 /** Below this many particles the helper round-trips cost more than they save. */
-const POOL_MIN = 1500;
+export const POOL_MIN = 1500;
 
 /**
  * Owns a World and answers protocol messages. Runs inside the Web Worker, or on the main thread

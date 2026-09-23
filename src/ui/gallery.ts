@@ -1,10 +1,10 @@
 import type { App } from '../app/app';
-import { confirmDialog, openDialog } from '../kit/dialog';
+import { openDialog } from '../kit/dialog';
 import { sfx } from '../kit/sfx';
 import { toast } from '../kit/toast';
 import { PRESETS, type Preset } from '../state/presets';
 import { type Favorite, favoritesBackup, markVisited, sanitizeFavorites, visitedPresets } from '../state/storage';
-import { buildHash } from '../state/url';
+import { blobToDataUrl, dataUrlToBlob, deleteImage, favThumbKey, imageBlob, imageUrl, putImage } from '../state/images';
 import { plural } from '../kit/cz';
 import { h } from './dom';
 import { segmented } from './controls';
@@ -12,6 +12,10 @@ import type { Autoplay } from '../app/app';
 import { icon } from './icons';
 import type { ThumbService } from './thumbs-service';
 
+const czDate = (ts: number) => {
+  const d = new Date(ts);
+  return `${d.getDate()}. ${d.getMonth() + 1}. ${d.getFullYear()}`;
+};
 const druhu = (n: number) => `${n} ${plural(n, 'druh', 'druhy', 'druhů')}`;
 
 export class GalleryTab {
@@ -57,13 +61,20 @@ export class GalleryTab {
         { value: 'evolve', label: 'Evoluce', icon: 'mutate', title: 'Matice se pomalu sama proměňuje (A)' },
       ],
       app.store.state.autoplay,
-      (v) => app.setAutoplay(v),
+      (v) => {
+        app.setAutoplay(v);
+        if (v !== 'off' && !app.store.state.zen) {
+          toast(v === 'gallery' ? 'Promítání galerie: každých 24 s nový svět.' : 'Evoluce: matice se pomalu sama proměňuje.', {
+            action: { label: 'Skrýt rozhraní', onClick: () => app.store.set({ zen: true }) },
+          });
+        }
+      },
     );
     app.store.on(['autoplay'], (st) => auto.set(st.autoplay));
 
     this.favGrid = h('div', { class: 'cards' });
     const backup = h('button', { type: 'button', class: 'link-btn', title: 'Stáhnout oblíbené světy jako soubor (záloha / přenos do jiného zařízení)' }, 'Zálohovat');
-    backup.addEventListener('click', () => this.exportFavorites());
+    backup.addEventListener('click', () => void this.exportFavorites());
     const restore = h('button', { type: 'button', class: 'link-btn', title: 'Nahrát oblíbené ze souboru zálohy' }, 'Nahrát zálohu');
     restore.addEventListener('click', () => this.importFavorites());
     this.favTools = h('span', { class: 'sec__tools' }, backup, restore);
@@ -136,14 +147,6 @@ export class GalleryTab {
 
   private loadThumbs(): void {
     const theme = this.app.store.state.theme;
-    // favourites without a picture first (e.g. migrated from the old app) – they are on top
-    for (const f of this.app.store.state.favorites) {
-      if (f.thumb) continue;
-      const colors = this.app.colorsFor(f.recipe.species, 'dark');
-      void this.thumbs.request(f.recipe, colors, 'dark', 1, f.id).then((url) => {
-        if (url) this.app.setFavoriteThumb(f.id, url);
-      });
-    }
     for (const p of PRESETS) {
       const card = this.presetCards.get(p.id)!;
       const media = card.querySelector('.card__media') as HTMLElement;
@@ -179,18 +182,26 @@ export class GalleryTab {
     this.progress.textContent = seen >= PRESETS.length ? `všech ${seen} prozkoumáno ✨` : `prozkoumáno ${seen}/${PRESETS.length}`;
     this.favGrid.querySelectorAll<HTMLElement>('.wcard').forEach((c) => {
       const on = c.dataset.id === s.favId;
-      c.setAttribute('aria-pressed', String(on));
+      c.classList.toggle('is-current', on);
+      c.querySelector('.wcard__open')?.setAttribute('aria-pressed', String(on));
       c.classList.toggle('is-modified', on && s.modified);
     });
   }
 
-  private exportFavorites(): void {
+  private async exportFavorites(): Promise<void> {
     const favs = this.app.store.state.favorites;
     if (favs.length === 0) {
       toast('Zatím nemáš žádné oblíbené světy.');
       return;
     }
-    const blob = new Blob([favoritesBackup(favs)], { type: 'application/json' });
+    // thumbnails travel inside the backup file
+    const withThumbs = await Promise.all(
+      favs.map(async (f) => {
+        const b = await imageBlob(favThumbKey(f.id));
+        return b ? { ...f, thumb: await blobToDataUrl(b) } : f;
+      }),
+    );
+    const blob = new Blob([favoritesBackup(withThumbs)], { type: 'application/json' });
     const a = h('a', { href: URL.createObjectURL(blob), download: `dots-oblibene-${new Date().toISOString().slice(0, 10)}.json` });
     document.body.append(a);
     a.click();
@@ -220,13 +231,24 @@ export class GalleryTab {
           toast('V souboru nejsou žádné světy z Dots.', { variant: 'danger' });
           return;
         }
-        const added = this.app.importFavorites(items);
-        toast(added ? `Přidáno světů: ${added}` : 'Všechny světy už v oblíbených máš.', { variant: added ? 'success' : 'default' });
-        if (added && this.started) this.loadThumbs();
+        void this.addImported(items);
       });
     });
     document.body.append(input);
     input.click();
+  }
+
+  private async addImported(items: Favorite[]): Promise<void> {
+    const added = this.app.importFavorites(items);
+    // store the pictures first so the new cards show them right away
+    await Promise.all(
+      added.map(async (f) => {
+        const b = f.thumb ? dataUrlToBlob(f.thumb) : null;
+        if (b) await putImage(favThumbKey(f.id), b);
+      }),
+    );
+    this.renderFavorites();
+    toast(added.length ? `Přidáno světů: ${added.length}` : 'Všechny světy už v oblíbených máš.', { variant: added.length ? 'success' : 'default' });
   }
 
   private renderFavorites(): void {
@@ -248,45 +270,56 @@ export class GalleryTab {
   }
 
   private favCard(f: Favorite): HTMLElement {
-    const media = h('div', { class: `card__media${f.thumb ? '' : ' is-loading'}` });
-    if (f.thumb) media.append(h('img', { class: 'card__img', src: f.thumb, alt: '', width: 320, height: 200 }));
-    const card = h(
-      'div',
-      { class: 'wcard wcard--fav', 'data-id': f.id, role: 'button', tabindex: 0, 'aria-pressed': 'false', 'aria-label': `Oblíbený svět ${f.name}` },
+    const img = h('img', { class: 'card__img', alt: '', width: 320, height: 200, decoding: 'async' });
+    const media = h('div', { class: 'card__media is-loading' }, img);
+    const open = h(
+      'button',
+      { type: 'button', class: 'wcard__open', 'aria-pressed': 'false', 'aria-label': `Otevřít oblíbený svět ${f.name}` },
       media,
       h('span', { class: 'wcard__name' }, f.name),
-      h('span', { class: 'wcard__desc' }, `${druhu(f.recipe.species)} · ${new Date(f.created).toLocaleDateString('cs-CZ')}`),
+      h('span', { class: 'wcard__desc' }, `${druhu(f.recipe.species)} · ${czDate(f.created)}`),
     );
+    open.addEventListener('click', () => {
+      sfx.pop();
+      this.app.applyFavorite(f.id);
+      if (window.matchMedia('(max-width: 759px)').matches) this.app.store.set({ panelOpen: false });
+    });
     const tools = h('div', { class: 'wcard__tools' });
     const mk = (ic: 'share' | 'edit' | 'trash', label: string, fn: () => void) => {
       const b = h('button', { type: 'button', class: 'wcard__tool', 'aria-label': `${label}: ${f.name}`, title: label }, icon(ic));
-      b.addEventListener('click', (e) => {
-        e.stopPropagation();
-        fn();
-      });
+      b.addEventListener('click', fn);
       tools.append(b);
     };
     mk('share', 'Zkopírovat odkaz', () => void this.shareFavorite(f));
     mk('edit', 'Přejmenovat', () => this.renameDialog(f));
-    mk('trash', 'Smazat', () => void this.deleteFavorite(f));
-    card.append(tools);
-    const apply = () => {
-      sfx.pop();
-      this.app.applyFavorite(f.id);
-      if (window.matchMedia('(max-width: 759px)').matches) this.app.store.set({ panelOpen: false });
-    };
-    card.addEventListener('click', apply);
-    card.addEventListener('keydown', (e) => {
-      if (e.target === card && (e.key === 'Enter' || e.key === ' ')) {
-        e.preventDefault();
-        apply();
-      }
+    mk('trash', 'Smazat', () => this.deleteFavorite(f));
+    const card = h('div', { class: 'wcard wcard--fav', 'data-id': f.id }, open, tools);
+    void this.favThumb(f).then((url) => {
+      if (url) img.src = url;
+      media.classList.remove('is-loading');
     });
     return card;
   }
 
+  /** Stored picture of a favourite, or a freshly simulated one (e.g. worlds migrated from the old app). */
+  private async favThumb(f: Favorite): Promise<string> {
+    const key = favThumbKey(f.id);
+    const url = await imageUrl(key);
+    if (url) return url;
+    if (f.thumb) {
+      const b = dataUrlToBlob(f.thumb);
+      if (b) return putImage(key, b);
+    }
+    return this.thumbs.request(f.recipe, this.app.colorsFor(f.recipe.species, 'dark'), 'dark', 1, f.id, key);
+  }
+
   saveDialog(): void {
-    const thumb = this.app.thumbnail();
+    const thumb = this.app.thumbnailBlob();
+    const img = h('img', { class: 'save-dlg__img', alt: 'Náhled světa' });
+    void thumb.then((b) => {
+      if (b) img.src = URL.createObjectURL(b);
+      else img.remove();
+    });
     const input = h('input', {
       type: 'text',
       class: 'g92-input',
@@ -298,7 +331,7 @@ export class GalleryTab {
     const content = h(
       'div',
       { class: 'save-dlg' },
-      thumb ? h('img', { class: 'save-dlg__img', src: thumb, alt: 'Náhled světa' }) : null,
+      img,
       h('label', { class: 'g92-field' }, h('span', { class: 'g92-label' }, 'Jak se tvůj svět jmenuje?'), input),
       h('p', { class: 'g92-hint' }, 'Uloží se matice, počty částic i fyzika. Najdeš ho v Galerii.'),
     );
@@ -313,6 +346,9 @@ export class GalleryTab {
         input.focus();
         input.select();
       },
+      onClose: () => {
+        if (img.src) setTimeout(() => URL.revokeObjectURL(img.src), 1000);
+      },
     });
     input.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
@@ -320,9 +356,12 @@ export class GalleryTab {
         d.close('ok');
       }
     });
-    void d.closed.then((v) => {
+    void d.closed.then(async (v) => {
       if (v !== 'ok') return;
-      const fav = this.app.saveFavorite(input.value);
+      const fav = this.app.newFavorite(input.value);
+      const b = await thumb;
+      if (b) await putImage(favThumbKey(fav.id), b);
+      this.app.addFavorite(fav);
       sfx.success();
       toast(`Uloženo: ${fav.name}`, { variant: 'success', duration: 2600 });
     });
@@ -353,18 +392,28 @@ export class GalleryTab {
     });
   }
 
-  private async deleteFavorite(f: Favorite): Promise<void> {
-    const ok = await confirmDialog({ title: `Smazat „${f.name}“?`, message: 'Svět zmizí z oblíbených.', confirmLabel: 'Smazat', danger: true });
-    if (!ok) return;
+  private deleteFavorite(f: Favorite): void {
     const index = this.app.store.state.favorites.findIndex((x) => x.id === f.id);
     const removed = this.app.deleteFavorite(f.id);
-    if (removed) {
-      toast(`Smazáno: ${removed.name}`, { action: { label: 'Vrátit', onClick: () => this.app.restoreFavorite(removed, index) } });
-    }
+    if (!removed) return;
+    let restored = false;
+    toast(`Smazáno: ${removed.name}`, {
+      duration: 7000,
+      action: {
+        label: 'Vrátit',
+        onClick: () => {
+          restored = true;
+          this.app.restoreFavorite(removed, index);
+        },
+      },
+    });
+    setTimeout(() => {
+      if (!restored && !this.app.store.state.favorites.some((x) => x.id === f.id)) void deleteImage(favThumbKey(f.id));
+    }, 9000);
   }
 
   private async shareFavorite(f: Favorite): Promise<void> {
-    const url = `${location.origin}${location.pathname}${buildHash({ recipe: f.recipe, name: f.name })}`;
+    const url = this.app.favoriteUrl(f);
     try {
       await navigator.clipboard.writeText(url);
       toast('Odkaz zkopírován – pošli ho komukoli.', { variant: 'success' });

@@ -1,7 +1,7 @@
 import type { App } from '../app/app';
 import { css, PALETTES, speciesColors } from '../state/palette';
 import type { CanvasTheme } from '../state/settings';
-import { section, segmented, slider, toggle } from './controls';
+import { actionButton, section, segmented, slider, toggle } from './controls';
 import { plural } from '../kit/cz';
 import { fmtNum, h } from './dom';
 
@@ -34,7 +34,7 @@ export class LookTab {
     const trails = slider({ label: 'Stopy', min: 0, max: 1, step: 0.01, value: st.trails, format: pct, hint: 'Jak dlouho za částicemi zůstává světelná stopa (T).', onInput: (v) => app.updateSettings({ trails: v }) });
     const glow = slider({ label: 'Záře', min: 0, max: 2, step: 0.01, value: st.glow, format: pct, onInput: (v) => app.updateSettings({ glow: v }) });
     const size = slider({ label: 'Velikost teček', min: 0.4, max: 2.5, step: 0.01, value: st.size, format: pct, onInput: (v) => app.updateSettings({ size: v }) });
-    const bonds = toggle('Živá síť', st.bonds, (v) => app.updateSettings({ bonds: v }), 'Svítící vlákna mezi částicemi, které se navzájem přitahují (B).');
+    const bonds = toggle('Živá síť', st.bonds, (v) => app.updateSettings({ bonds: v }), 'Tenká vlákna mezi částicemi, které se navzájem přitahují (B).');
     const vignette = toggle('Ztmavené okraje', st.vignette, (v) => app.updateSettings({ vignette: v }));
     const hud = toggle('Statistiky', st.hud, (v) => app.updateSettings({ hud: v }), 'FPS, počet částic a graf pohybové energie.');
 
@@ -52,6 +52,10 @@ export class LookTab {
     });
     zoom.el.hidden = st.zoom === 0;
 
+    const hideUi = actionButton('eyeOff', 'Skrýt rozhraní', () => app.store.set({ zen: true }), {
+      kbd: 'H',
+      title: 'Jen plátno bez tlačítek – třeba jako živý spořič (H)',
+    });
     const tech = h('p', { class: 'tech' });
     const renderTech = () => {
       const s = app.stats;
@@ -67,7 +71,7 @@ export class LookTab {
       section('Plátno', theme.el),
       section('Barvy', palettes),
       section('Světlo', trails.el, glow.el, size.el, bonds.el, vignette.el),
-      section('Rozhraní', hud.el, autoZoom.el, zoom.el, tech),
+      section('Rozhraní', h('div', { class: 'act-row' }, hideUi), hud.el, autoZoom.el, zoom.el, tech),
     );
 
     app.store.on(['settings'], (s) => {

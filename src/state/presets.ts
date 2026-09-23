@@ -42,7 +42,7 @@ export const PRESETS: readonly Preset[] = [
   {
     id: 'hadi',
     name: 'Hadi',
-    desc: 'Dlouhá svítící těla se plazí mezi poli drobných kvítků.',
+    desc: 'Dlouhá hadí těla se plazí mezi poli drobných kvítků.',
     species: 6,
     matrix: [0.23, 0.34, 0.1, -0.36, -0.7, 0.43, -0.23, 0.87, 0.35, 0.92, -0.78, -0.4, 0, -0.51, -0.54, -0.24, -0.65, 0.9, -0.64, -0.18, -0.6, -0.42, 0.48, -0.49, 0.51, -0.78, -0.45, 0.65, 0.52, -0.09, -0.38, -0.04, 0.55, 0.31, 0.2, -0.78],
   },

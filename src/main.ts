@@ -3,6 +3,7 @@ import './styles/app.css';
 import { recordActivity } from './kit/activity';
 import './kit/appbar';
 import { openSettingsDialog } from './kit/dialog';
+import { getSettings, setSettings } from './kit/settings';
 import { sfx } from './kit/sfx';
 import { toast } from './kit/toast';
 import { App } from './app/app';
@@ -57,8 +58,12 @@ const input = new CanvasInput(app, app.canvasEl);
 const zenBtn = h('button', { type: 'button', class: 'zen-exit', 'aria-label': 'Zobrazit rozhraní', title: 'Zobrazit rozhraní (H)' }, icon('eye'));
 zenBtn.addEventListener('click', () => setZen(false));
 stage.append(input.ring, hud.el, recorder.pill, hud.paused, toolbar.el, panel.el, zenBtn);
-// generate gallery previews in the background once the page settled
-setTimeout(() => gallery.activate(), 2500);
+// gallery previews are simulated and painted in a worker; start them once the page is idle
+// (the gallery tab starts them right away when it is opened earlier)
+setTimeout(() => {
+  const idle = window.requestIdleCallback ?? ((cb: () => void) => window.setTimeout(cb, 50));
+  idle(() => gallery.activate(), { timeout: 6000 });
+}, 4000);
 
 // appbar actions
 const shareBtn = document.getElementById('btnShare')!;
@@ -104,6 +109,9 @@ app.start();
 input.onFirstUse = () => coach?.classList.add('is-leaving');
 const coach = onboarding(app, stage);
 
+// a different link pasted into the address bar / back-forward within the tab → switch worlds
+window.addEventListener('hashchange', () => app.openHash(location.hash));
+
 // the stage must never scroll (older Safari has no overflow: clip)
 stage.addEventListener('scroll', () => {
   if (stage.scrollLeft || stage.scrollTop) stage.scrollTo(0, 0);
@@ -119,9 +127,16 @@ new ResizeObserver(() => {
 // ------------------------------------------------------------------ zen mode
 function setZen(on: boolean): void {
   app.store.set({ zen: on });
-  document.body.classList.toggle('zen', on);
-  if (on) toast('Rozhraní je skryté – vrátíš ho klávesou H nebo tlačítkem v rohu.', { duration: 3200 });
 }
+// zen can be switched from the keyboard (H), the Vzhled / Galerie tabs and the autoplay toast
+app.store.on(['zen'], (s) => {
+  document.body.classList.toggle('zen', s.zen);
+  if (s.zen) {
+    app.store.set({ panelOpen: false });
+    const how = matchMedia('(any-pointer: fine)').matches ? 'klávesou H nebo tlačítkem v rohu' : 'tlačítkem s okem v pravém horním rohu';
+    toast(`Rozhraní je skryté – vrátíš ho ${how}.`, { duration: 3200 });
+  }
+});
 
 // ------------------------------------------------------------------ share & screenshot
 const share = () => shareWorld(app);
@@ -179,11 +194,20 @@ window.addEventListener('keydown', (e) => {
       sfx.whoosh();
       app.surprise();
       break;
-    case 'm':
-    case 'M':
+    case 'z':
+    case 'Z':
       sfx.flip();
       app.mutate();
       break;
+    case 'm':
+    case 'M': {
+      // same key as in the other g92 games: M = sound
+      const on = !getSettings().sound;
+      setSettings({ sound: on });
+      if (on) sfx.pop();
+      flash(on ? 'Zvuk zapnutý' : 'Zvuk vypnutý');
+      break;
+    }
     case 'y':
     case 'Y':
       app.symmetrize();
@@ -286,7 +310,8 @@ window.addEventListener('keydown', (e) => {
       break;
     case 'ArrowLeft':
     case 'ArrowRight':
-      if (e.target instanceof HTMLElement && e.target.closest('.panel')) return;
+      // arrows belong to sliders, tabs, segmented controls and the matrix when those have focus
+      if (e.target instanceof HTMLElement && e.target.closest('input, select, textarea, [role="tablist"], .g92-segmented, .matrix')) return;
       stepPreset(k === 'ArrowRight' ? 1 : -1);
       break;
     case 'Escape':

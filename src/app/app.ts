@@ -1,7 +1,9 @@
 import { GLRenderer } from '../render/gl';
 import { Canvas2DRenderer } from '../render/canvas2d';
+import { encodeCanvas } from '../render/thumbs';
 import type { FrameData, LookParams, Renderer } from '../render/types';
 import { SimClient } from '../sim/client';
+import { POOL_MIN } from '../sim/host';
 import type { FrameResult } from '../sim/protocol';
 import { mulberry32, randomSeed, type Rng } from '../sim/rng';
 import { type Brush, clamp, clampPhysics, type Layout, type Physics } from '../sim/types';
@@ -29,7 +31,9 @@ import {
   zeroMatrix,
 } from '../state/recipe';
 import { type CanvasTheme, hasStoredSettings, loadSettings, saveSettings, type Settings } from '../state/settings';
+import { dataUrlToBlob, favThumbKey, putImage } from '../state/images';
 import {
+  dropLegacyThumbCache,
   type Favorite,
   legacyMigrated,
   loadFavorites,
@@ -41,6 +45,7 @@ import {
 import { resolvedTheme, subscribeSettings } from '../kit/settings';
 import { buildHash, parseHash } from '../state/url';
 import { Store } from './store';
+import { fmtInt } from '../ui/dom';
 
 /** Particles per million square world units at density 1 (matches the original Dots). */
 export const BASE_DENSITY = 2400;
@@ -257,14 +262,13 @@ export class App {
     if (migrated > 0) {
       setTimeout(() => this.toast(`Tvoje uložená nastavení (${migrated}) najdeš v Galerii mezi oblíbenými.`, { ms: 7000 }), 1500);
     }
-    const fromHash = parseHash(location.hash, this.store.state.recipe);
+    dropLegacyThumbCache();
+    void this.migrateFavoriteThumbs();
+    const fromHash = this.resolveHash(location.hash);
     const session = loadSession();
     let initial: { recipe: Recipe; presetId: string | null; title: string; favId: string | null; modified: boolean };
-    if (fromHash.recipe) {
-      initial = { recipe: fromHash.recipe, presetId: null, favId: null, title: fromHash.name ?? 'Sdílený svět', modified: false };
-    } else if (fromHash.presetId && getPreset(fromHash.presetId)) {
-      const p = getPreset(fromHash.presetId)!;
-      initial = { recipe: this.presetRecipe(p), presetId: p.id, title: p.name, favId: null, modified: false };
+    if (fromHash && fromHash !== 'broken') {
+      initial = { ...fromHash, favId: null, modified: false };
     } else if (session && session.recipe) {
       const recipe = sanitizeRecipe(session.recipe, this.store.state.recipe);
       initial = {
@@ -281,6 +285,7 @@ export class App {
       const p = getPreset(DEFAULT_PRESET_ID)!;
       initial = { recipe: this.presetRecipe(p), presetId: p.id, title: p.name, favId: null, modified: false };
     }
+    if (fromHash === 'broken') this.brokenLinkToast(initial.title);
     // effective matrix first: store listeners (matrix editor) repaint from it synchronously
     this.setMatrixInstant(initial.recipe.matrix);
     this.store.set({ ...initial });
@@ -301,6 +306,65 @@ export class App {
     document.addEventListener('visibilitychange', this.onVisibility);
     this.last = performance.now();
     this.raf = requestAnimationFrame(this.loop);
+  }
+
+  /**
+   * World requested by a URL hash: a shared recipe (particle count adapted to this screen) or a
+   * gallery world. `null` = the hash asks for nothing, `'broken'` = it asked but can't be read.
+   */
+  private resolveHash(hash: string): { recipe: Recipe; presetId: string | null; title: string } | 'broken' | null {
+    const h = parseHash(hash, this.store.state.recipe);
+    if (h.recipe) {
+      const recipe = h.recipe;
+      const t = total(recipe.counts);
+      // links carry the sender's density; older links only absolute counts → fit them to this screen
+      const want = h.density !== undefined ? this.defaultTotal(h.density) : this.defaultTotal(1);
+      if (t > 0 && (h.density !== undefined || Math.abs(t - want) / want > 0.3)) recipe.counts = scaleCounts(recipe.counts, want);
+      return { recipe, presetId: null, title: h.name ?? 'Sdílený svět' };
+    }
+    if (h.presetId) {
+      const p = getPreset(h.presetId);
+      if (p) return { recipe: this.presetRecipe(p), presetId: p.id, title: p.name };
+      return 'broken';
+    }
+    return h.broken ? 'broken' : null;
+  }
+
+  private brokenLinkToast(showing: string): void {
+    setTimeout(() => this.toast(`Odkaz je poškozený nebo neúplný – ukazuji svět ${showing}.`, { ms: 6000 }), 600);
+  }
+
+  /** The address changed in an open tab (pasted link, back/forward) → show that world. */
+  openHash(hash: string): void {
+    if (hash === this.lastHash) return;
+    const r = this.resolveHash(hash);
+    if (r === 'broken') {
+      this.brokenLinkToast(this.store.state.title || 'beze změny');
+      this.scheduleUrl();
+      return;
+    }
+    if (!r) return;
+    if (r.presetId && r.presetId === this.store.state.presetId && !this.store.state.modified) return;
+    this.applyRecipe({ ...r.recipe }, { presetId: r.presetId, title: r.title });
+  }
+
+  /** Favourites saved by v2 carried their thumbnail inside localStorage → move it to the image store. */
+  private async migrateFavoriteThumbs(): Promise<void> {
+    const favs = this.store.state.favorites;
+    const withThumb = favs.filter((f) => f.thumb);
+    if (withThumb.length === 0) return;
+    for (const f of withThumb) {
+      const b = dataUrlToBlob(f.thumb!);
+      if (b) await putImage(favThumbKey(f.id), b);
+    }
+    const stripped = this.store.state.favorites.map(({ thumb: _t, ...rest }) => rest);
+    saveFavorites(stripped);
+    this.store.set({ favorites: stripped });
+  }
+
+  /** Particle density of the current world relative to this screen's default (for links). */
+  density(counts = this.store.state.recipe.counts): number {
+    return total(counts) / Math.max(1, this.defaultTotal(1));
   }
 
   /** Measure the canvas host and derive the world size. Returns true when it changed. */
@@ -490,6 +554,7 @@ export class App {
     this.frame = r;
     this.frameDirty = true;
     this.stats.n = r.n;
+    if (r.n >= POOL_MIN) this.client.enableHelpers();
     if (r.steps > 0) this.stats.threads = r.threads;
     if (r.steps > 0) {
       this.stats.stepMs = this.stats.stepMs * 0.85 + r.stepMs * 0.15;
@@ -535,7 +600,7 @@ export class App {
       this.tuneCooldownUntil = now + 3000;
       if (!this.tunedOnce) {
         this.tunedOnce = true;
-        this.toast(`Aby simulace běžela plynule, ubral jsem částice na ${target.toLocaleString('cs-CZ')}.`, {
+        this.toast(`Aby simulace běžela plynule, ubral jsem částice na ${fmtInt(target)}.`, {
           action: 'Vypnout',
           onAction: () => this.updateSettings({ autoTune: false }),
           ms: 6000,
@@ -741,7 +806,10 @@ export class App {
   applyFavorite(id: string): void {
     const f = this.store.state.favorites.find((x) => x.id === id);
     if (!f) return;
-    this.applyRecipe({ ...f.recipe, seed: randomSeed() }, { favId: f.id, title: f.name });
+    const recipe = { ...f.recipe, seed: randomSeed() };
+    // saved on another screen (backup import) → same density here
+    if (f.density !== undefined) recipe.counts = scaleCounts(f.recipe.counts, this.defaultTotal(f.density));
+    this.applyRecipe(recipe, { favId: f.id, title: f.name });
     if (typeof f.bonds === 'boolean') this.updateSettings({ bonds: f.bonds });
   }
 
@@ -932,20 +1000,23 @@ export class App {
 
   // ------------------------------------------------------------------ favourites
 
-  saveFavorite(name: string): Favorite {
+  /** A favourite of the current world (not stored yet – see addFavorite). */
+  newFavorite(name: string): Favorite {
     const s = this.store.state;
-    const fav: Favorite = {
+    return {
       id: newId(),
       name: name.trim().slice(0, 40) || this.suggestName(),
       created: Date.now(),
       recipe: cloneRecipe(s.recipe),
       bonds: s.settings.bonds,
-      thumb: this.thumbnail(),
+      density: Math.round(this.density() * 100) / 100,
     };
-    const favorites = [fav, ...s.favorites];
+  }
+
+  addFavorite(fav: Favorite): void {
+    const favorites = [fav, ...this.store.state.favorites];
     if (!saveFavorites(favorites)) this.toast('Úložiště prohlížeče je plné – oblíbené se nemusí zachovat.');
     this.store.set({ favorites, favId: fav.id, title: fav.name, modified: false, presetId: null });
-    return fav;
   }
 
   suggestName(): string {
@@ -973,17 +1044,17 @@ export class App {
     this.store.set({ favorites });
   }
 
-  /** Merge imported favourites (skips exact duplicates). Returns how many were added. */
-  importFavorites(items: Favorite[]): number {
+  /** Merge imported favourites (skips exact duplicates). Returns the added ones (with new ids). */
+  importFavorites(items: Favorite[]): Favorite[] {
     const cur = this.store.state.favorites;
     const sig = (f: Favorite) => `${f.name}|${f.recipe.species}|${f.recipe.matrix.join(',')}`;
     const seen = new Set(cur.map(sig));
     const add = items.filter((f) => !seen.has(sig(f))).map((f) => ({ ...f, id: newId() }));
-    if (add.length === 0) return 0;
-    const favorites = [...add, ...cur];
-    if (!saveFavorites(favorites)) this.toast('Úložiště prohlížeče je plné – některé náhledy se neuložily.');
+    if (add.length === 0) return [];
+    const favorites = [...add.map(({ thumb: _t, ...rest }) => rest), ...cur];
+    if (!saveFavorites(favorites)) this.toast('Úložiště prohlížeče je plné – oblíbené se nemusí zachovat.');
     this.store.set({ favorites });
-    return add.length;
+    return add;
   }
 
   renameFavorite(id: string, name: string): void {
@@ -993,11 +1064,7 @@ export class App {
     this.store.set({ favorites, title: s.favId === id ? favorites.find((f) => f.id === id)!.name : s.title });
   }
 
-  setFavoriteThumb(id: string, thumb: string): void {
-    const favorites = this.store.state.favorites.map((f) => (f.id === id ? { ...f, thumb } : f));
-    saveFavorites(favorites);
-    this.store.set({ favorites });
-  }
+
 
   // ------------------------------------------------------------------ capture / share
 
@@ -1007,7 +1074,8 @@ export class App {
     return this.renderer.capture(maxWidth);
   }
 
-  thumbnail(): string | undefined {
+  /** Small picture of the current view (grabbed now, encoded asynchronously). */
+  thumbnailBlob(): Promise<Blob | undefined> {
     try {
       const c = this.captureCanvas(320);
       // crop to 16:10 – on tall (phone) or very wide screens pick the band with the most going on
@@ -1044,29 +1112,40 @@ export class App {
         }
       }
       ctx.drawImage(c, best.x, best.y, sw, sh, 0, 0, 240, 150);
-      const webp = out.toDataURL('image/webp', 0.82);
-      return webp.startsWith('data:image/webp') ? webp : out.toDataURL('image/jpeg', 0.82);
+      return encodeCanvas(out, 0.8).catch(() => undefined);
     } catch {
-      return undefined;
+      return Promise.resolve(undefined);
     }
   }
 
   shareUrl(): string {
-    const s = this.store.state;
-    const hash =
-      s.presetId && !s.modified
-        ? buildHash({ presetId: s.presetId })
-        : buildHash({ recipe: s.recipe, name: s.title || undefined });
-    return `${location.origin}${location.pathname}${hash}`;
+    return `${location.origin}${location.pathname}${this.currentHash()}`;
   }
+
+  private currentHash(): string {
+    const s = this.store.state;
+    return s.presetId && !s.modified
+      ? buildHash({ presetId: s.presetId })
+      : buildHash({ recipe: s.recipe, name: s.title || undefined, density: this.density() });
+  }
+
+  /** Link to a favourite (density travels with it). */
+  favoriteUrl(f: Favorite): string {
+    const d = f.density ?? this.density(f.recipe.counts);
+    return `${location.origin}${location.pathname}${buildHash({ recipe: f.recipe, name: f.name, density: d })}`;
+  }
+
+  private lastHash = '';
 
   private scheduleUrl(): void {
     clearTimeout(this.urlTimer);
     this.urlTimer = window.setTimeout(() => {
-      const url = this.shareUrl();
-      if (url !== location.href) history.replaceState(null, '', url);
+      const hash = this.currentHash();
+      this.lastHash = hash;
+      if (hash !== location.hash) history.replaceState(null, '', `${location.pathname}${location.search}${hash}`);
     }, 400);
   }
+
 
   private scheduleSession(): void {
     clearTimeout(this.sessionTimer);

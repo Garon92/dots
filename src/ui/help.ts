@@ -24,7 +24,7 @@ export const SHORTCUTS: { group: string; items: [string, string][] }[] = [
     items: [
       ['R', 'náhodná matice'],
       ['Shift+R', 'překvapení – náhodný celý svět'],
-      ['M', 'zmutovat (malá změna)'],
+      ['Z', 'zmutovat (malá změna)'],
       ['Y', 'souměrná matice'],
       ['I', 'obrátit znaménka'],
       ['X', 'prohodit role (transponovat)'],
@@ -55,8 +55,9 @@ export const SHORTCUTS: { group: string; items: [string, string][] }[] = [
       ['T', 'stopy zapnout / vypnout'],
       ['H', 'skrýt celé rozhraní'],
       ['F', 'celá obrazovka'],
+      ['M', 'zvuk zapnout / vypnout'],
       ['S', 'uložit do oblíbených'],
-      ['C', 'uložit obrázek (PNG)'],
+      ['C', 'uložit obrázek (JPEG)'],
       ['Shift+C', 'nahrát 8s video'],
       ['U', 'zkopírovat odkaz'],
       ['A', 'promítání: galerie → evoluce → vypnout'],
@@ -154,6 +155,27 @@ function miniMatrix(colors: string[]): string {
 
 export function openExplainer(app: App): void {
   const colors = app.colorsFor(3, 'dark').map((c) => css(c));
+  // touch-only devices get tips phrased with the on-screen buttons instead of keys
+  const fine = matchMedia('(any-pointer: fine)').matches;
+  const tips = (
+    fine
+      ? [
+          'Projdi <b>Galerii</b> a podívej se, jak různé světy vypadají.',
+          'Stiskni <b>R</b> pro náhodnou matici – každá je nový vesmír. Když se ti něco líbí, <b>Z</b> ho trochu zmutuje.',
+          'Drž myš na plátně a rozfoukej částice. <b>Shift</b> nebo pravé tlačítko je naopak přitáhne.',
+          'Zapni <b>živou síť</b> (B) – uvidíš neviditelná pouta, která drží buňky pohromadě.',
+          'Povedený svět si ulož (S) nebo pošli odkaz kamarádovi – odkaz obsahuje celou matici.',
+        ]
+      : [
+          'Otevři <b>Galerii</b> (tlačítko s posuvníky dole) a podívej se, jak různé světy vypadají.',
+          'Kostka dole vymyslí <b>náhodnou matici</b> – každá je nový vesmír. V záložce Matice ji tlačítkem <b>Zmutovat</b> trochu pozměníš.',
+          'Drž prst na plátně a rozfoukej částice. <b>Dvěma prsty</b> je naopak přitáhneš, třemi roztočíš vír.',
+          'V záložce Vzhled zapni <b>živou síť</b> – uvidíš neviditelná pouta, která drží buňky pohromadě.',
+          'Povedený svět si ulož tlačítkem <b>Uložit svět</b> nebo pošli odkaz kamarádovi – odkaz obsahuje celou matici.',
+        ]
+  )
+    .map((t) => `<li>${t}</li>`)
+    .join('');
   const content = h('div', {
     class: 'explain',
     html: `
@@ -171,24 +193,18 @@ export function openExplainer(app: App): void {
     <h3>Jak číst matici</h3>
     <div class="explain__row">
       ${miniMatrix(colors)}
-      <p><b>Řádek</b> je ten, kdo se hýbe, <b>sloupec</b> je ten, na koho reaguje. Teplá oranžová buňka znamená „přitahuje mě“, dutý tyrkysový kroužek „odpuzuje mě“. Čím sytější, tím silněji. Buňku změníš tažením nahoru a dolů – nebo na ni klikni a nastav ji přesně.</p>
+      <p><b>Řádek</b> je ten, kdo se hýbe, <b>sloupec</b> je ten, na koho reaguje. Teplá oranžová buňka znamená „přitahuje mě“, dutý tyrkysový kroužek „odpuzuje mě“. Čím sytější, tím silněji. Buňku změníš tažením nahoru a dolů – nebo na ni ${fine ? 'klikni' : 'klepni'} a nastav ji přesně.</p>
     </div>
 
     <h3>Proč to vypadá živě?</h3>
     <p>Matice <b>nemusí být souměrná</b>. Když první druh honí druhý, ale druhý před prvním utíká, žádná rovnováha nenastane – vznikne nekonečná honička. Právě tahle nerovnováha dává světu pohyb, rotace a „lov“. Zkus tlačítko <b>Souměrná</b> – honičky zmizí a svět se usadí do klidných krystalů.</p>
 
     <h3>Co zkusit</h3>
-    <ul class="explain__tips">
-      <li>Projdi <b>Galerii</b> a podívej se, jak různé světy vypadají.</li>
-      <li>Stiskni <b>R</b> pro náhodnou matici – každá je nový vesmír. Když se ti něco líbí, <b>M</b> ho trochu zmutuje.</li>
-      <li>Drž myš (nebo prst) na plátně a rozfoukej částice. <b>Shift</b> nebo <b>dva prsty</b> je naopak přitáhnou.</li>
-      <li>Zapni <b>živou síť</b> (B) – uvidíš neviditelná pouta, která drží buňky pohromadě.</li>
-      <li>Povedený svět si ulož (S) nebo pošli odkaz kamarádovi – odkaz obsahuje celou matici.</li>
-    </ul>
+    <ul class="explain__tips">${tips}</ul>
     <p class="explain__credit">Myšlenka „particle life“ pochází od Jeffreyho Ventrelly (Clusters) a Toma Mohra. Stejný princip – jednoduchá pravidla, složité chování – se v biologii a fyzice nazývá <i>emergence</i>.</p>`,
   });
   const keysBtn = h('button', { type: 'button', class: 'g92-btn g92-btn--ghost explain__keys', html: `${ICONS.keyboard}<span>Klávesové zkratky</span>` });
-  content.append(keysBtn);
+  if (fine) content.append(keysBtn);
   const d = openDialog({
     title: 'Jak to funguje?',
     icon: UI_ICONS.help,

@@ -51,16 +51,27 @@ export function simulateThumb(job: ThumbJob): ThumbFrames {
   return { w: job.w, h: job.h, frames };
 }
 
-const spriteCache = new Map<string, HTMLCanvasElement>();
+type AnyCanvas = HTMLCanvasElement | OffscreenCanvas;
+type Ctx2D = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
 
-function sprite(c: Rgb, theme: 'dark' | 'light'): HTMLCanvasElement {
+/** A 2D canvas that works on the main thread and inside workers. */
+export function makeCanvas(w: number, h: number): AnyCanvas {
+  if (typeof OffscreenCanvas !== 'undefined') return new OffscreenCanvas(w, h);
+  const c = document.createElement('canvas');
+  c.width = w;
+  c.height = h;
+  return c;
+}
+
+const spriteCache = new Map<string, AnyCanvas>();
+
+function sprite(c: Rgb, theme: 'dark' | 'light'): AnyCanvas {
   const key = `${theme}:${c.join(',')}`;
   let s = spriteCache.get(key);
   if (s) return s;
   const R = 24;
-  s = document.createElement('canvas');
-  s.width = s.height = R * 2;
-  const g = s.getContext('2d')!;
+  s = makeCanvas(R * 2, R * 2);
+  const g = s.getContext('2d') as Ctx2D;
   const grad = g.createRadialGradient(R, R, 0, R, R, R);
   const [r, gg, b] = c;
   if (theme === 'dark') {
@@ -84,7 +95,7 @@ export const THUMB_BG = { dark: '#0a0e12', light: '#f6f3ec' } as const;
 
 /** Paint preview frames into a 2D canvas (oldest frames faint, the last one bright). */
 export function drawThumb(
-  ctx: CanvasRenderingContext2D,
+  ctx: Ctx2D,
   data: ThumbFrames,
   colors: readonly Rgb[],
   theme: 'dark' | 'light',
@@ -113,4 +124,23 @@ export function drawThumb(
     }
   });
   ctx.restore();
+}
+
+/** Paint a preview and encode it (WebP where supported, else JPEG). Works in workers. */
+export async function renderThumbBlob(data: ThumbFrames, colors: readonly Rgb[], theme: 'dark' | 'light', w = 320, h = 200): Promise<Blob> {
+  const c = makeCanvas(w, h);
+  drawThumb(c.getContext('2d') as Ctx2D, data, colors, theme, 7);
+  return encodeCanvas(c);
+}
+
+export async function encodeCanvas(c: AnyCanvas, quality = 0.82): Promise<Blob> {
+  const enc = (type: string): Promise<Blob | null> =>
+    'convertToBlob' in c
+      ? c.convertToBlob({ type, quality }).catch(() => null)
+      : new Promise((res) => (c as HTMLCanvasElement).toBlob(res, type, quality));
+  const webp = await enc('image/webp');
+  if (webp && webp.type === 'image/webp') return webp;
+  const jpeg = await enc('image/jpeg');
+  if (jpeg) return jpeg;
+  throw new Error('Náhled se nepodařilo zakódovat');
 }

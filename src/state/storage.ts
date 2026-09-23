@@ -17,7 +17,9 @@ export interface Favorite {
   created: number;
   recipe: Recipe;
   bonds?: boolean;
-  /** Small WebP/JPEG data URL. */
+  /** Particle density relative to the screen default when saved (1 = default). */
+  density?: number;
+  /** Small WebP/JPEG data URL (only in backups; stored separately, see images.ts). */
   thumb?: string;
 }
 
@@ -42,6 +44,7 @@ type DotsData = {
   settings: unknown;
   favorites: FavoritesFile;
   session: SessionData | null;
+  /** @deprecated preview images moved to Cache Storage (images.ts); removed on start. */
   thumbs: ThumbCache | null;
   /** Ids of gallery worlds the user has opened (menu progress). */
   visited: string[];
@@ -137,6 +140,7 @@ export function sanitizeFavorites(file: unknown): Favorite[] {
       created: typeof x.created === 'number' ? x.created : Date.now(),
       recipe: sanitizeRecipe(x.recipe, REPAIR),
       bonds: typeof x.bonds === 'boolean' ? x.bonds : undefined,
+      density: typeof x.density === 'number' && Number.isFinite(x.density) && x.density > 0 ? Math.min(8, x.density) : undefined,
       thumb: typeof x.thumb === 'string' && /^data:image\/(webp|jpeg|png);base64,/.test(x.thumb) && x.thumb.length < 200_000 ? x.thumb : undefined,
     }));
 }
@@ -146,22 +150,25 @@ export function favoritesBackup(items: Favorite[]): string {
   return JSON.stringify({ app: 'dots', v: 1, exported: new Date().toISOString(), items } satisfies FavoritesFile & { app: string; exported: string });
 }
 
-/** Returns false when the browser refused to store them (quota) – thumbnails are then dropped. */
+/**
+ * Persist favourites (without thumbnails – those live in the image store). Returns false when
+ * the browser refused to store them (quota).
+ */
 export function saveFavorites(items: Favorite[]): boolean {
   const s = dotsStore();
-  const persisted = (value: FavoritesFile) => {
-    try {
-      return localStorage.getItem(s.keyOf('favorites')) === JSON.stringify(value);
-    } catch {
-      return false;
-    }
-  };
-  const file: FavoritesFile = { v: 1, items };
+  const file: FavoritesFile = { v: 1, items: items.map(({ thumb: _thumb, ...rest }) => rest) };
   s.set('favorites', file);
-  if (persisted(file)) return true;
-  const slim: FavoritesFile = { v: 1, items: items.map((f, i) => (i >= 6 ? { ...f, thumb: undefined } : f)) };
-  s.set('favorites', slim);
-  return persisted(slim);
+  try {
+    return localStorage.getItem(s.keyOf('favorites')) === JSON.stringify(file);
+  } catch {
+    return false;
+  }
+}
+
+/** Drop the old localStorage preview cache (≤ v2 stored ~1 MB of data URLs there). */
+export function dropLegacyThumbCache(): void {
+  const s = dotsStore();
+  if (s.get('thumbs') !== null) s.reset('thumbs');
 }
 
 export function loadSession(): SessionData | null {

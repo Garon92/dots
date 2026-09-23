@@ -1,13 +1,12 @@
-import { drawThumb, simulateThumb, type ThumbFrames, type ThumbJob } from '../render/thumbs';
+import { renderThumbBlob, type ThumbFrames, type ThumbJob, simulateThumb } from '../render/thumbs';
 import { hashString } from '../sim/rng';
+import { imageUrl, putImage } from '../state/images';
 import type { Rgb } from '../state/palette';
 import type { Recipe } from '../state/recipe';
-import { dotsStore } from '../state/storage';
 
 const W = 720;
 const H = 450;
-const CACHE_VERSION = 4;
-const MAX_CACHED = 48;
+const VERSION = 5;
 
 interface Pending {
   key: string;
@@ -17,10 +16,12 @@ interface Pending {
   resolve: (url: string) => void;
 }
 
+type WorkerReply = { key: string; blob?: Blob; data?: ThumbFrames; error?: string };
+
 /**
- * Generates gallery previews by actually running each world for a few hundred steps in a
- * background worker, then paints the last frames (motion trail) into a small image.
- * Results are cached in memory and in localStorage.
+ * Gallery previews: each world is simulated for a few hundred steps in a background worker, which
+ * also paints and encodes the picture (OffscreenCanvas) – the main thread only receives a Blob.
+ * Pictures are kept in Cache Storage (images.ts), so later visits show them instantly.
  */
 export class ThumbService {
   private worker: Worker | null = null;
@@ -29,13 +30,16 @@ export class ThumbService {
   private memory = new Map<string, string>();
   private inflight = new Map<string, Promise<string>>();
 
-  constructor() {
+  private ensureWorker(): Worker | null {
+    if (this.worker) return this.worker;
     try {
       this.worker = new Worker(new URL('../render/thumbs.worker.ts', import.meta.url), { type: 'module', name: 'dots-thumbs' });
-      this.worker.onmessage = (e: MessageEvent<{ key: string; data?: ThumbFrames; error?: string }>) => this.done(e.data);
+      this.worker.onmessage = (e: MessageEvent<WorkerReply>) => void this.done(e.data);
       this.worker.onerror = (e) => {
         e.preventDefault();
+        this.worker?.terminate();
         this.worker = null;
+        this.broken = true;
         const b = this.busy;
         this.busy = null;
         if (b) this.queue.unshift(b);
@@ -43,48 +47,56 @@ export class ThumbService {
       };
     } catch {
       this.worker = null;
+      this.broken = true;
     }
-    const cache = dotsStore().get('thumbs');
-    if (cache && cache.v === CACHE_VERSION && cache.entries) {
-      for (const [k, v] of Object.entries(cache.entries)) if (typeof v === 'string') this.memory.set(k, v);
-    }
+    return this.worker;
   }
+  private broken = false;
 
   /** Cache key: depends on everything that changes the picture. */
   keyFor(recipe: Recipe, colors: readonly Rgb[], theme: string, density: number): string {
-    return `${theme}:${hashString(JSON.stringify([recipe.species, recipe.matrix, recipe.physics, recipe.layout, colors, density])).toString(36)}`;
+    return `thumb/${VERSION}-${theme}-${hashString(JSON.stringify([recipe.species, recipe.matrix, recipe.physics, recipe.layout, colors, density])).toString(36)}`;
   }
 
+  /** Synchronous hit from this page's memory (no flash of the placeholder). */
   get(key: string): string | undefined {
     return this.memory.get(key);
   }
 
-  request(recipe: Recipe, colors: readonly Rgb[], theme: 'dark' | 'light', density = 1, seedKey = ''): Promise<string> {
-    const key = this.keyFor(recipe, colors, theme, density);
+  /** Picture for a world: from memory, from Cache Storage, or freshly generated. */
+  request(recipe: Recipe, colors: readonly Rgb[], theme: 'dark' | 'light', density = 1, seedKey = '', key = this.keyFor(recipe, colors, theme, density)): Promise<string> {
     const hit = this.memory.get(key);
     if (hit) return Promise.resolve(hit);
     const existing = this.inflight.get(key);
     if (existing) return existing;
-    const total = Math.round(((W * H) / 1e6) * 2400 * density);
-    const sum = recipe.counts.reduce((a, b) => a + b, 0) || 1;
-    const counts = recipe.counts.map((c) => Math.round((c / sum) * total));
-    const job: ThumbJob = {
-      species: recipe.species,
-      matrix: recipe.matrix,
-      counts,
-      physics: recipe.physics,
-      layout: recipe.layout,
-      seed: hashString(seedKey || key),
-      w: W,
-      h: H,
-      steps: 420,
-      trail: 9,
-    };
-    const p = new Promise<string>((resolve) => {
-      this.queue.push({ key, job, colors, theme, resolve });
-    });
+    const p = (async () => {
+      const stored = await imageUrl(key);
+      if (stored) {
+        this.memory.set(key, stored);
+        return stored;
+      }
+      const totalN = Math.round(((W * H) / 1e6) * 2400 * density);
+      const sum = recipe.counts.reduce((a, b) => a + b, 0) || 1;
+      const counts = recipe.counts.map((c) => Math.round((c / sum) * totalN));
+      const job: ThumbJob = {
+        species: recipe.species,
+        matrix: recipe.matrix,
+        counts,
+        physics: recipe.physics,
+        layout: recipe.layout,
+        seed: hashString(seedKey || key),
+        w: W,
+        h: H,
+        steps: 420,
+        trail: 9,
+      };
+      return new Promise<string>((resolve) => {
+        this.queue.push({ key, job, colors, theme, resolve });
+        this.pump();
+      });
+    })();
     this.inflight.set(key, p);
-    this.pump();
+    void p.finally(() => this.inflight.delete(key));
     return p;
   }
 
@@ -92,47 +104,33 @@ export class ThumbService {
     if (this.busy || this.queue.length === 0) return;
     const next = this.queue.shift()!;
     this.busy = next;
-    if (this.worker) {
-      this.worker.postMessage({ key: next.key, job: next.job });
+    const w = this.broken ? null : this.ensureWorker();
+    if (w) {
+      w.postMessage({ key: next.key, job: next.job, colors: next.colors, theme: next.theme });
     } else {
-      // no worker: compute in idle slices on the main thread
-      setTimeout(() => this.done({ key: next.key, data: simulateThumb(next.job) }), 30);
+      // no worker: compute in a later task on the main thread
+      setTimeout(() => void this.done({ key: next.key, data: simulateThumb(next.job) }), 30);
     }
   }
 
-  private done(msg: { key: string; data?: ThumbFrames; error?: string }): void {
+  private async done(msg: WorkerReply): Promise<void> {
     const p = this.busy;
     this.busy = null;
-    if (p && p.key === msg.key && msg.data) {
-      const url = this.paint(msg.data, p.colors, p.theme);
-      this.memory.set(p.key, url);
-      this.inflight.delete(p.key);
+    let url = '';
+    if (p && p.key === msg.key) {
+      try {
+        const blob = msg.blob ?? (msg.data ? await renderThumbBlob(msg.data, p.colors, p.theme) : null);
+        if (blob) {
+          url = await putImage(p.key, blob);
+          this.memory.set(p.key, url);
+        }
+      } catch {
+        url = '';
+      }
       p.resolve(url);
-      this.persistSoon();
     } else if (p) {
-      this.inflight.delete(p.key);
       p.resolve('');
     }
     this.pump();
-  }
-
-  private paint(data: ThumbFrames, colors: readonly Rgb[], theme: 'dark' | 'light'): string {
-    const c = document.createElement('canvas');
-    c.width = 320;
-    c.height = 200;
-    drawThumb(c.getContext('2d')!, data, colors, theme, 7);
-    const webp = c.toDataURL('image/webp', 0.8);
-    return webp.startsWith('data:image/webp') ? webp : c.toDataURL('image/jpeg', 0.82);
-  }
-
-  private persistTimer = 0;
-  private persistSoon(): void {
-    clearTimeout(this.persistTimer);
-    this.persistTimer = window.setTimeout(() => {
-      const entries: Record<string, string> = {};
-      const all = [...this.memory.entries()].slice(-MAX_CACHED);
-      for (const [k, v] of all) entries[k] = v;
-      dotsStore().set('thumbs', { v: CACHE_VERSION, entries });
-    }, 1500);
   }
 }

@@ -13,7 +13,7 @@ export default defineConfig({
     VitePWA(
       g92Pwa('dots', {
         name: 'Dots — částicový život',
-        description: 'Simulace „particle life": barevné tečky, jedna matice sil a z ní samovolně vznikají buňky, hadi i lov.',
+        description: 'Simulace „particle life“: barevné tečky, jedna matice sil a z ní samovolně vznikají buňky, hadi i lov.',
       }),
     ),
   ],

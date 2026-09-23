@@ -127,7 +127,7 @@ export class MatrixTab {
       'div',
       { class: 'act-grid' },
       actionButton('dice', 'Náhodná', () => app.randomize(), { kbd: 'R', variant: 'act--accent' }),
-      actionButton('mutate', 'Zmutovat', () => app.mutate(), { kbd: 'M' }),
+      actionButton('mutate', 'Zmutovat', () => app.mutate(), { kbd: 'Z' }),
       actionButton('symmetric', 'Souměrná', () => app.symmetrize(), { kbd: 'Y', title: 'Souměrná matice – nikdo nikoho nehoní (Y)' }),
       actionButton('invert', 'Obrátit', () => app.invert(), { kbd: 'I', title: 'Obrátit znaménka – přitahování ↔ odpuzování (I)' }),
       actionButton('transpose', 'Prohodit', () => app.transpose(), { kbd: 'X', title: 'Prohodit role – kdo honil, bude honěn (X)' }),
