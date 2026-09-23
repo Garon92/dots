@@ -113,9 +113,14 @@ export class WorldTab {
       this.sync();
       layoutBtns.querySelectorAll('button').forEach((b, i) => b.setAttribute('aria-pressed', String(LAYOUT_OPTS[i].value === st.recipe.layout)));
     });
+    let palette = s.settings.palette;
     app.store.on(['settings'], (st) => {
       auto.set(st.settings.autoTune);
       speed.set(st.settings.speed);
+      if (st.settings.palette !== palette) {
+        palette = st.settings.palette;
+        this.buildSpecies();
+      }
     });
     app.store.on(['theme'], () => this.buildSpecies());
   }

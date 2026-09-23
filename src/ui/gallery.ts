@@ -5,9 +5,12 @@ import { toast } from '../kit/toast';
 import { PRESETS, type Preset } from '../state/presets';
 import type { Favorite } from '../state/storage';
 import { buildHash } from '../state/url';
+import { plural } from '../kit/cz';
 import { h } from './dom';
 import { icon } from './icons';
 import type { ThumbService } from './thumbs-service';
+
+const druhu = (n: number) => `${n} ${plural(n, 'druh', 'druhy', 'druhů')}`;
 
 export class GalleryTab {
   readonly el: HTMLElement;
@@ -82,7 +85,7 @@ export class GalleryTab {
 
   private presetCard(p: Preset): HTMLElement {
     const img = h('img', { class: 'card__img', alt: '', width: 320, height: 200, loading: 'lazy', decoding: 'async' });
-    const media = h('div', { class: 'card__media is-loading' }, img, h('span', { class: 'card__badge' }, `${p.species} druhů`));
+    const media = h('div', { class: 'card__media is-loading' }, img, h('span', { class: 'card__badge' }, druhu(p.species)));
     const card = h(
       'button',
       { type: 'button', class: 'wcard', 'data-id': p.id, 'aria-pressed': 'false' },
@@ -169,7 +172,7 @@ export class GalleryTab {
       { class: 'wcard wcard--fav', 'data-id': f.id, role: 'button', tabindex: 0, 'aria-pressed': 'false', 'aria-label': `Oblíbený svět ${f.name}` },
       media,
       h('span', { class: 'wcard__name' }, f.name),
-      h('span', { class: 'wcard__desc' }, `${f.recipe.species} druhů · ${new Date(f.created).toLocaleDateString('cs-CZ')}`),
+      h('span', { class: 'wcard__desc' }, `${druhu(f.recipe.species)} · ${new Date(f.created).toLocaleDateString('cs-CZ')}`),
     );
     const tools = h('div', { class: 'wcard__tools' });
     const mk = (ic: 'share' | 'edit' | 'trash', label: string, fn: () => void) => {

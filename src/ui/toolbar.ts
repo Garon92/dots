@@ -123,14 +123,20 @@ export class Toolbar {
     this.current.setAttribute('aria-expanded', String(open));
   }
 
+  private memo = '';
+
   private sync(): void {
     const s = this.app.store.state;
+    const tool = s.settings.tool;
+    const pick = s.settings.brushSpecies;
+    const key = [s.running, s.panelOpen, tool, pick, s.recipe.species, s.settings.palette, s.theme].join('|');
+    if (key === this.memo) return;
+    this.memo = key;
     const running = s.running;
     this.play.replaceChildren(icon(running ? 'pause' : 'play'));
     this.play.setAttribute('aria-label', running ? 'Pozastavit' : 'Spustit');
     this.play.title = running ? 'Pozastavit (mezerník)' : 'Spustit (mezerník)';
     this.step.hidden = running;
-    const tool = s.settings.tool;
     TOOLS.forEach((t, i) => {
       this.toolBtns[i].setAttribute('aria-pressed', String(t.id === tool));
       this.popBtns[i].setAttribute('aria-checked', String(t.id === tool));
@@ -145,8 +151,11 @@ export class Toolbar {
     // species picker for the spawn tool
     this.speciesPop.hidden = tool !== 'spawn';
     if (tool === 'spawn') {
+      if (pick >= s.recipe.species) {
+        this.app.updateSettings({ brushSpecies: -1 });
+        return;
+      }
       const colors = this.app.colors();
-      const pick = s.settings.brushSpecies;
       const mk = (idx: number, label: string, style: string) => {
         const b = h('button', { type: 'button', class: 'sp', 'aria-pressed': String(pick === idx), 'aria-label': label, title: label, style });
         b.addEventListener('click', () => this.app.updateSettings({ brushSpecies: idx }));
@@ -155,7 +164,6 @@ export class Toolbar {
       const btns = [mk(-1, 'Náhodný druh', `--c: conic-gradient(${colors.map((c) => css(c)).join(',')})`)];
       colors.forEach((c, i) => btns.push(mk(i, SPECIES_NAMES[i], `--c:${css(c)}`)));
       this.speciesPop.replaceChildren(h('span', { class: 'species-pick__label' }, 'Přidávat:'), ...btns);
-      if (pick >= s.recipe.species) this.app.updateSettings({ brushSpecies: -1 });
     }
   }
 }

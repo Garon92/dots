@@ -146,7 +146,11 @@ export class App {
     private host: HTMLElement,
   ) {
     const settings = loadSettings();
-    if (this.reducedMotion && !hasStoredSettings()) settings.trails = 0;
+    if (!hasStoredSettings()) {
+      if (this.reducedMotion) settings.trails = 0;
+      // phones: keep the small screen for the simulation, statistics can be switched on in Vzhled
+      if (matchMedia('(pointer: coarse)').matches && Math.min(screen.width, screen.height) < 600) settings.hud = false;
+    }
     const fallback = this.presetRecipe(getPreset(DEFAULT_PRESET_ID)!, 3000);
     const favorites = loadFavorites();
     this.store = new Store<AppState>({
