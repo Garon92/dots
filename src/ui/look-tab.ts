@@ -2,6 +2,7 @@ import type { App } from '../app/app';
 import { css, PALETTES, speciesColors } from '../state/palette';
 import type { CanvasTheme } from '../state/settings';
 import { section, segmented, slider, toggle } from './controls';
+import { plural } from '../kit/cz';
 import { fmtNum, h } from './dom';
 
 export class LookTab {
@@ -54,7 +55,7 @@ export class LookTab {
     const tech = h('p', { class: 'tech' });
     const renderTech = () => {
       const s = app.stats;
-      const sim = s.sim === 'worker' ? (s.threads > 0 ? `Web Worker + ${s.threads} pomocná vlákna` : 'Web Worker') : 'hlavní vlákno';
+      const sim = s.sim === 'worker' ? (s.threads > 0 ? `Web Worker + ${s.threads} ${plural(s.threads, 'pomocné vlákno', 'pomocná vlákna', 'pomocných vláken')}` : 'Web Worker') : 'hlavní vlákno';
       tech.textContent = `Vykreslování: ${s.renderer === 'webgl2' ? 'WebGL 2' : 'Canvas 2D'} · simulace: ${sim}`;
     };
     renderTech();

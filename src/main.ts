@@ -103,6 +103,11 @@ app.start();
 input.onFirstUse = () => coach?.classList.add('is-leaving');
 const coach = onboarding(app, stage);
 
+// the stage must never scroll (older Safari has no overflow: clip)
+stage.addEventListener('scroll', () => {
+  if (stage.scrollLeft || stage.scrollTop) stage.scrollTo(0, 0);
+});
+
 // resize → world resize
 let resizeRaf = 0;
 new ResizeObserver(() => {

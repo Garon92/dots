@@ -32,6 +32,8 @@ body.dots {
   min-height: 0;
   height: calc(100dvh - var(--g92-appbar-total));
   overflow: hidden;
+  /* clip = not scrollable even programmatically (a hidden panel or a drag must never scroll it) */
+  overflow: clip;
   background: var(--canvas-dark);
   isolation: isolate;
   touch-action: none;
