@@ -49,7 +49,7 @@ Každá tečka vidí sousedy do vzdálenosti *dosah*. Zblízka se všechny odstr
 
   | svět / částic | původní verze | nová verze |
   |---|---|---|
-  | Oběžné řetězy 3 000 | 4,5 ms/krok (hlavní vlákno) | 1,3–1,8 ms |
+  | Oběžné řetězy 3 000 | 4,5 ms/krok (hlavní vlákno) | 1,5–2,5 ms |
   | Oběžné řetězy 6 000 / 10 000 / 14 000 | – (max. 4 200) | 3,7 / 7,0 / 11,3 ms |
   | Buňky (husté shluky) 3 000 / 6 000 / 10 000 | – | 2,3 / 7,2 / 20,5 ms |
 

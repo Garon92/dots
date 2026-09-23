@@ -14,12 +14,16 @@ export class SimHost {
   world: World | null = null;
   private rng: Rng = mulberry32(1);
   private pool: ForcePool | null = null;
-  // adaptive choice between the local pass and the pool (EMA of ms per step for each)
-  private emaLocal = 0;
-  private emaPool = 0;
+  // adaptive choice between the local pass and the pool (recent per-step timings of each)
+  private samplesLocal: number[] = [];
+  private samplesPool: number[] = [];
   private stepsSinceProbe = 0;
   private usePool = true;
   private lastThreads = 0;
+  /** Pool steps still ignored for timing (helpers JIT-warming up). */
+  private poolWarmup = 40;
+  /** Particle count the EMAs were measured at; a big change restarts the comparison. */
+  private measuredN = 0;
 
   handle(msg: ToWorker): { result: FrameResult; transfer: Transferable[] } | null | Promise<{ result: FrameResult; transfer: Transferable[] }> {
     switch (msg.t) {
@@ -84,40 +88,50 @@ export class SimHost {
     world.setMatrix(msg.species, msg.matrix);
     const steps = Math.max(0, Math.min(8, msg.steps | 0));
     if (steps === 0) return this.pack(msg, 0);
-    // Occasionally measure the other mode (one step) so the choice follows the scene; when one
-    // mode is clearly faster the other is probed only rarely (a slow probe is a visible hiccup).
+    // A big change of the particle count restarts the comparison.
+    if (this.measuredN === 0 || Math.abs(world.n - this.measuredN) > this.measuredN * 0.2) {
+      this.measuredN = world.n;
+      this.samplesPool.length = 0;
+      this.samplesLocal.length = 0;
+      this.usePool = true;
+      this.stepsSinceProbe = 200;
+    }
+    // Occasionally measure the other mode for one step so the choice follows the scene; when one
+    // mode is clearly faster the other is probed less often (a slow probe is a small hiccup).
+    const mp = median(this.samplesPool);
+    const ml = median(this.samplesLocal);
+    const ratio = mp && ml ? Math.max(mp, ml) / Math.min(mp, ml) : 1;
     this.stepsSinceProbe += steps;
-    const ratio = this.emaPool && this.emaLocal ? Math.max(this.emaPool, this.emaLocal) / Math.min(this.emaPool, this.emaLocal) : 1;
-    const interval = ratio > 2 ? 3600 : 300;
-    const probe = this.stepsSinceProbe > interval;
+    const probe = this.stepsSinceProbe > (ratio > 2 ? 900 : 300);
     if (probe) this.stepsSinceProbe = 0;
     const small = world.n < POOL_MIN;
     const t0 = performance.now();
-    let tPool = 0;
     let nPool = 0;
-    let tLocal = 0;
     let nLocal = 0;
     for (let s = 0; s < steps; s++) {
       const opt = { physics: msg.physics, brushes: msg.brushes, bonds: msg.bonds && s === steps - 1 };
       let mode = small ? false : this.usePool;
       if (probe && s === 0 && !small) mode = !mode;
       const ts = performance.now();
-      if (mode && world.grid.simpleWrap !== false) {
+      if (mode) {
         const rMax = world.prepareStep(opt, this.rng);
-        const bondN = world.grid.simpleWrap ? await pool.compute(world, rMax, opt.physics.beta, !!opt.bonds) : world.computePairs(rMax, opt.physics.beta, !!opt.bonds);
+        const bondN = world.grid.simpleWrap
+          ? await pool.compute(world, rMax, opt.physics.beta, !!opt.bonds)
+          : world.computePairs(rMax, opt.physics.beta, !!opt.bonds);
         world.finishStep(opt, rMax, bondN);
-        tPool += performance.now() - ts;
         nPool++;
+        if (this.poolWarmup > 0) this.poolWarmup--;
+        else pushSample(this.samplesPool, performance.now() - ts);
       } else {
         world.step(opt, this.rng);
-        tLocal += performance.now() - ts;
         nLocal++;
+        if (!small) pushSample(this.samplesLocal, performance.now() - ts);
       }
     }
     const ms = (performance.now() - t0) / steps;
-    if (nPool) this.emaPool = this.emaPool ? this.emaPool * 0.7 + (tPool / nPool) * 0.3 : tPool / nPool;
-    if (nLocal && !small) this.emaLocal = this.emaLocal ? this.emaLocal * 0.7 + (tLocal / nLocal) * 0.3 : tLocal / nLocal;
-    if (!small && this.emaPool && this.emaLocal) this.usePool = this.emaPool < this.emaLocal * 0.95;
+    const p = median(this.samplesPool);
+    const l = median(this.samplesLocal);
+    if (!small && p && l) this.usePool = p < l * 0.95;
     this.lastThreads = nPool > 0 && nPool >= nLocal ? pool.size : 0;
     return this.pack(msg, ms);
   }
@@ -164,4 +178,15 @@ export class SimHost {
     };
     return { result, transfer: [pos.buffer, spc.buffer, bnd.buffer] };
   }
+}
+
+function pushSample(list: number[], v: number): void {
+  list.push(v);
+  if (list.length > 7) list.shift();
+}
+
+function median(list: number[]): number {
+  if (list.length < 3) return 0;
+  const s = [...list].sort((a, b) => a - b);
+  return s[s.length >> 1];
 }
