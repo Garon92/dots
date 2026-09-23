@@ -16,6 +16,8 @@ export interface ThumbJob {
   steps: number;
   /** How many of the last steps to overlay as a motion trail. */
   trail: number;
+  /** Keep every n-th step for the trail (default 2). */
+  trailEvery?: number;
 }
 
 export interface ThumbFrames {
@@ -32,7 +34,7 @@ export function simulateThumb(job: ThumbJob): ThumbFrames {
   world.reseed(job.counts, job.layout, rng);
   const physics = clampPhysics(job.physics);
   const frames: ThumbFrames['frames'] = [];
-  const trailEvery = 2;
+  const trailEvery = job.trailEvery ?? 2;
   for (let s = 0; s < job.steps; s++) {
     world.step({ physics }, rng);
     const left = job.steps - 1 - s;

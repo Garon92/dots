@@ -61,7 +61,7 @@ for (const it of items) {
     fig.append(c, cap);
     g.append(fig);
     const t0 = performance.now();
-    const frames = simulateThumb({ ...it, seed: Number(q.get('s') ?? 5), w: W, h: H, steps, trail: 10 });
+    const frames = simulateThumb({ ...it, seed: Number(q.get('s') ?? 5), w: W, h: H, steps, trail: Number(q.get('trail') ?? 10), trailEvery: Number(q.get('every') ?? 2) });
     drawThumb(c.getContext('2d')!, frames, speciesColors(pal, theme, it.species), theme, 7);
     cap.textContent = `${it.name} @${steps} — ${((performance.now() - t0) / steps).toFixed(2)} ms/krok`;
   }

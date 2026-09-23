@@ -83,13 +83,21 @@ export class Hud {
     const w = this.spark.width;
     const hgt = this.spark.height;
     c.clearRect(0, 0, w, hgt);
-    let mx = 1e-6;
-    for (const v of keHistory) if (v > mx) mx = v;
+    // auto-scale to the visible range so small changes in motion are readable
+    let mx = -Infinity;
+    let mn = Infinity;
+    for (const v of keHistory) {
+      if (v > mx) mx = v;
+      if (v < mn) mn = v;
+    }
+    const range = Math.max(mx - mn, mx * 0.15, 1e-6);
+    mn = Math.max(0, mn - range * 0.1);
+    mx = mn + range * 1.2;
     const n = keHistory.length;
     const accent = getComputedStyle(this.el).getPropertyValue('--accent').trim() || '#14b8a6';
     c.beginPath();
     for (let i = 0; i < n; i++) {
-      const v = keHistory[(keHead + i) % n] / mx;
+      const v = (keHistory[(keHead + i) % n] - mn) / (mx - mn);
       const x = (i / (n - 1)) * (w - 4) + 2;
       const y = hgt - 3 - v * (hgt - 8);
       if (i === 0) c.moveTo(x, y);

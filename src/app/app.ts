@@ -254,8 +254,10 @@ export class App {
       const p = getPreset(DEFAULT_PRESET_ID)!;
       initial = { recipe: this.presetRecipe(p), presetId: p.id, title: p.name, favId: null, modified: false };
     }
-    this.store.set({ ...initial });
+    // effective matrix first: store listeners (matrix editor) repaint from it synchronously
     this.setMatrixInstant(initial.recipe.matrix);
+    this.store.set({ ...initial });
+    this.onMatrixFrame();
     this.client.post({
       t: 'init',
       w: this.worldW,

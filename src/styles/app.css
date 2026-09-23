@@ -1884,3 +1884,16 @@ body.zen .coach {
     animation: none;
   }
 }
+
+/* share / screenshot live in the appbar on wide screens, in the gallery on phones */
+@media (min-width: 560px) {
+  .gal-top .g92-btn--secondary {
+    display: none;
+  }
+}
+
+@media (max-width: 559px) {
+  .appbar-action {
+    display: none !important;
+  }
+}

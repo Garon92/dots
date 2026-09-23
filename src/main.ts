@@ -21,6 +21,7 @@ import { Panel } from './ui/panel';
 import { ThumbService } from './ui/thumbs-service';
 import { TOOLS, Toolbar } from './ui/toolbar';
 import { WorldTab } from './ui/world-tab';
+import { saveScreenshot, shareWorld } from './ui/share';
 
 const stage = document.getElementById('stage')!;
 const canvas = document.getElementById('field') as HTMLCanvasElement;
@@ -33,7 +34,7 @@ app.toast = (msg, o) => {
 
 // ------------------------------------------------------------------ UI
 const thumbs = new ThumbService();
-const gallery = new GalleryTab(app, thumbs);
+const gallery = new GalleryTab(app, thumbs, { share: () => void share(), shot: () => void screenshot() });
 const matrix = new MatrixTab(app);
 const world = new WorldTab(app);
 const look = new LookTab(app);
@@ -107,58 +108,8 @@ function setZen(on: boolean): void {
 }
 
 // ------------------------------------------------------------------ share & screenshot
-async function share(): Promise<void> {
-  const url = app.shareUrl();
-  const title = app.store.state.title || 'Dots';
-  const coarse = matchMedia('(pointer: coarse)').matches;
-  if (coarse && navigator.share) {
-    try {
-      await navigator.share({ title: `${title} · Dots`, text: 'Podívej se na tenhle svět živých teček:', url });
-      return;
-    } catch (err) {
-      if ((err as Error).name === 'AbortError') return;
-    }
-  }
-  try {
-    await navigator.clipboard.writeText(url);
-    sfx.pop();
-    toast('Odkaz zkopírován – kdo ho otevře, uvidí přesně tenhle svět.', { variant: 'success' });
-  } catch {
-    window.prompt('Zkopíruj si odkaz:', url);
-  }
-}
-
-async function screenshot(): Promise<void> {
-  const c = app.captureCanvas();
-  const title = (app.store.state.title || 'dots').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-  const stamp = new Date().toISOString().slice(0, 16).replace(/[T:]/g, '-');
-  const name = `dots-${title || 'svet'}-${stamp}.png`;
-  const blob = await new Promise<Blob | null>((res) => c.toBlob(res, 'image/png'));
-  if (!blob) {
-    toast('Obrázek se nepodařilo vytvořit.', { variant: 'danger' });
-    return;
-  }
-  sfx.click();
-  stage.classList.remove('flash');
-  void stage.offsetWidth;
-  stage.classList.add('flash');
-  const file = new File([blob], name, { type: 'image/png' });
-  const coarse = matchMedia('(pointer: coarse)').matches;
-  if (coarse && navigator.canShare?.({ files: [file] })) {
-    try {
-      await navigator.share({ files: [file], title: 'Dots' });
-      return;
-    } catch (err) {
-      if ((err as Error).name === 'AbortError') return;
-    }
-  }
-  const a = h('a', { href: URL.createObjectURL(blob), download: name });
-  document.body.append(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
-  toast(`Obrázek uložen: ${name}`, { variant: 'success' });
-}
+const share = () => shareWorld(app);
+const screenshot = () => saveScreenshot(app, stage);
 
 // ------------------------------------------------------------------ keyboard
 function stepPreset(dir: number): void {

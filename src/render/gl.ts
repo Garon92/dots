@@ -9,7 +9,7 @@ import { BG, type FrameData, type LookParams, type Renderer } from './types';
  *     – particles as instanced quads with a sharp core and a gaussian halo, additive blending
  *  2. A composite pass maps the buffer to the screen:
  *     – dark canvas: emitted light over the ink background with a soft highlight roll-off
- *     – light canvas: the buffer holds absorbance, paper × e^(−absorbance) (ink on paper)
+ *     – light canvas: ink on paper – the average ink colour laid over the paper by coverage
  *     plus vignette and dithering.
  */
 
@@ -122,7 +122,11 @@ void main() {
     vec3 e = softclip(a);
     col = u_bg + e * (1.0 - u_bg);
   } else {
-    col = u_bg * exp(-a);
+    // ink on paper: average ink colour, coverage from the accumulated amount (never goes black)
+    float amount = max(texture(u_acc, v_uv).a, 0.0);
+    vec3 ink = a / max(amount, 1e-4);
+    float t = 1.0 - exp(-amount * 1.6);
+    col = mix(u_bg, ink, t * 0.92);
   }
   vec2 q = (v_uv - 0.5) * u_aspect;
   float v = smoothstep(0.42, 1.05, length(q));
@@ -294,8 +298,7 @@ export class GLRenderer implements Renderer {
       if (i >= 8) return;
       for (let k = 0; k < 3; k++) {
         const v = rgb[k] / 255;
-        // light theme: absorbance so that one full particle core reproduces the ink colour
-        c[i * 3 + k] = look.theme === 'dark' ? v : -Math.log(Math.max(v, 0.03)) * 1.05;
+        c[i * 3 + k] = v;
       }
     });
   }

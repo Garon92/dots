@@ -20,6 +20,7 @@ export class GalleryTab {
   constructor(
     private app: App,
     private thumbs: ThumbService,
+    actions: { share: () => void; shot: () => void },
   ) {
     const surprise = h(
       'button',
@@ -33,6 +34,10 @@ export class GalleryTab {
     });
     const save = h('button', { type: 'button', class: 'g92-btn gal-cta', title: 'Uložit tento svět do oblíbených (S)' }, icon('star'), 'Uložit svět');
     save.addEventListener('click', () => this.saveDialog());
+    const shareBtn = h('button', { type: 'button', class: 'g92-btn g92-btn--secondary gal-cta', title: 'Zkopírovat odkaz na tento svět (U)' }, icon('share'), 'Sdílet');
+    shareBtn.addEventListener('click', () => actions.share());
+    const shotBtn = h('button', { type: 'button', class: 'g92-btn g92-btn--secondary gal-cta', title: 'Uložit obrázek plátna (C)' }, icon('camera'), 'Obrázek');
+    shotBtn.addEventListener('click', () => actions.shot());
 
     this.favGrid = h('div', { class: 'cards' });
     this.favSection = h(
@@ -47,7 +52,7 @@ export class GalleryTab {
     this.el = h(
       'div',
       { class: 'tab-page', id: 'tab-galerie' },
-      h('div', { class: 'gal-top' }, surprise, save),
+      h('div', { class: 'gal-top' }, surprise, save, shareBtn, shotBtn),
       this.favSection,
       h('section', { class: 'sec' }, h('h3', { class: 'sec__title' }, 'Světy k objevování'), this.presetGrid),
     );
