@@ -129,6 +129,14 @@ export class GalleryTab {
 
   private loadThumbs(): void {
     const theme = this.app.store.state.theme;
+    // favourites without a picture first (e.g. migrated from the old app) – they are on top
+    for (const f of this.app.store.state.favorites) {
+      if (f.thumb) continue;
+      const colors = this.app.colorsFor(f.recipe.species, 'dark');
+      void this.thumbs.request(f.recipe, colors, 'dark', 1, f.id).then((url) => {
+        if (url) this.app.setFavoriteThumb(f.id, url);
+      });
+    }
     for (const p of PRESETS) {
       const card = this.presetCards.get(p.id)!;
       const media = card.querySelector('.card__media') as HTMLElement;
@@ -146,14 +154,6 @@ export class GalleryTab {
       void this.thumbs.request(recipe, colors, theme, p.density ?? 1, p.id).then((url) => {
         if (url) img.src = url;
         media.classList.remove('is-loading');
-      });
-    }
-    // favourites without a picture (e.g. migrated from the old app)
-    for (const f of this.app.store.state.favorites) {
-      if (f.thumb) continue;
-      const colors = this.app.colorsFor(f.recipe.species, 'dark');
-      void this.thumbs.request(f.recipe, colors, 'dark', 1, f.id).then((url) => {
-        if (url) this.app.setFavoriteThumb(f.id, url);
       });
     }
   }
