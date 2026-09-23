@@ -1118,6 +1118,11 @@ export class App {
     }
   }
 
+  /** Same-origin link back to exactly this world (for the menu's "Pokračovat"). */
+  deepLink(): string {
+    return `${location.pathname}${this.currentHash()}`;
+  }
+
   shareUrl(): string {
     return `${location.origin}${location.pathname}${this.currentHash()}`;
   }

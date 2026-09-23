@@ -126,3 +126,15 @@ export function blobToDataUrl(blob: Blob): Promise<string> {
 }
 
 export const favThumbKey = (id: string): string => `fav/${id}`;
+
+/** Remove every stored image (reset of the app). */
+export async function clearImages(): Promise<void> {
+  memory.clear();
+  for (const u of urls.values()) URL.revokeObjectURL(u);
+  urls.clear();
+  try {
+    if (hasCaches()) await caches.delete(CACHE);
+  } catch {
+    /* ignore */
+  }
+}

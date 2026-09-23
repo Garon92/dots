@@ -2,20 +2,20 @@ import './kit/kit.css';
 import './styles/app.css';
 import { recordActivity } from './kit/activity';
 import './kit/appbar';
-import { openSettingsDialog } from './kit/dialog';
-import { getSettings, setSettings } from './kit/settings';
+import { onDialogChange, setSettingsSection } from './kit/dialog';
+import { appbarAction } from './kit/appbar';
+import { settingsSection } from './ui/settings-section';
 import { sfx } from './kit/sfx';
 import { toast } from './kit/toast';
 import { App } from './app/app';
 import { PRESETS } from './state/presets';
 import { markVisited, visitedPresets } from './state/storage';
 import { SPEEDS } from './state/settings';
-import { segmented } from './ui/controls';
 import { h, isTypingTarget } from './ui/dom';
 import { GalleryTab } from './ui/gallery';
-import { onboarding, openExplainer, openShortcuts } from './ui/help';
+import { onboarding, openExplainer } from './ui/help';
 import { Hud } from './ui/hud';
-import { icon } from './ui/icons';
+import { ICONS, icon } from './ui/icons';
 import { CanvasInput } from './ui/input';
 import { LookTab } from './ui/look-tab';
 import { MatrixTab } from './ui/matrix';
@@ -65,37 +65,26 @@ setTimeout(() => {
   idle(() => gallery.activate(), { timeout: 6000 });
 }, 4000);
 
-// appbar actions
-const shareBtn = document.getElementById('btnShare')!;
-const shotBtn = document.getElementById('btnShot')!;
-const videoBtn = document.getElementById('btnVideo')!;
-shareBtn.append(icon('share'));
-shotBtn.append(icon('camera'));
-videoBtn.append(icon('video'));
-shareBtn.addEventListener('click', () => void share());
-shotBtn.addEventListener('click', () => void screenshot());
-videoBtn.addEventListener('click', () => recorder.toggle());
-if (!Recorder.supported()) videoBtn.hidden = true;
-appbar.addEventListener('g92-help', () => openExplainer(app));
-appbar.addEventListener('g92-settings', (e) => {
+// appbar actions – kit look (appbarAction), shown in the appbar on wider screens, in the gallery on phones
+for (const a of [
+  { icon: ICONS.share, label: 'Sdílet odkaz na tento svět (U)', onClick: () => void share() },
+  { icon: ICONS.camera, label: 'Uložit obrázek (C)', onClick: () => void screenshot() },
+  ...(Recorder.supported() ? [{ icon: ICONS.video, label: 'Nahrát 8s video (Shift+C)', onClick: () => recorder.toggle() }] : []),
+]) {
+  appbarAction({ ...a, appbar }).classList.add('dots-appbar-action');
+}
+
+// "?" → the rich explainer (charts); the kit's own help dialog is not registered, so nothing else opens
+appbar.addEventListener('g92-help', (e) => {
   e.preventDefault();
-  const st = app.store.state.settings;
-  const extra = h(
-    'div',
-    { class: 'g92-field' },
-    h('span', { class: 'g92-label' }, 'Plátno simulace'),
-    segmented(
-      'Plátno simulace',
-      [
-        { value: 'auto', label: 'Podle vzhledu' },
-        { value: 'dark', label: 'Noc' },
-        { value: 'light', label: 'Papír' },
-      ],
-      st.canvasTheme,
-      (v) => app.updateSettings({ canvasTheme: v }),
-    ).el,
-  );
-  openSettingsDialog({ extra, hideName: true });
+  openExplainer(app);
+});
+
+// ⚙ → kit settings dialog with the Dots section (canvas theme + reset)
+setSettingsSection({
+  nameMode: 'hidden',
+  showVoice: false,
+  extra: () => settingsSection(app),
 });
 appbar.addEventListener('g92-fullscreen', () => setTimeout(() => app.onResize(), 50));
 
@@ -108,6 +97,22 @@ syncCanvasTheme();
 app.start();
 input.onFirstUse = () => coach?.classList.add('is-leaving');
 const coach = onboarding(app, stage);
+
+// kit dialogs (help, settings, save, confirm…) pause the simulation while they are open
+let pausedByDialog = false;
+onDialogChange((open) => {
+  if (open && app.store.state.running) {
+    pausedByDialog = true;
+    app.togglePause(false);
+  } else if (!open && pausedByDialog) {
+    pausedByDialog = false;
+    app.togglePause(true);
+  }
+});
+app.store.on(['running'], (s) => {
+  // the user resumed (e.g. from a toast) – don't resume again on close
+  if (s.running) pausedByDialog = false;
+});
 
 // a different link pasted into the address bar / back-forward within the tab → switch worlds
 window.addEventListener('hashchange', () => app.openHash(location.hash));
@@ -199,15 +204,6 @@ window.addEventListener('keydown', (e) => {
       sfx.flip();
       app.mutate();
       break;
-    case 'm':
-    case 'M': {
-      // same key as in the other g92 games: M = sound
-      const on = !getSettings().sound;
-      setSettings({ sound: on });
-      if (on) sfx.pop();
-      flash(on ? 'Zvuk zapnutý' : 'Zvuk vypnutý');
-      break;
-    }
     case 'y':
     case 'Y':
       app.symmetrize();
@@ -279,10 +275,6 @@ window.addEventListener('keydown', (e) => {
     case 'H':
       setZen(!app.store.state.zen);
       break;
-    case 'f':
-    case 'F':
-      void appbar.toggleFullscreen();
-      break;
     case 's':
     case 'S':
       gallery.saveDialog();
@@ -304,9 +296,6 @@ window.addEventListener('keydown', (e) => {
     case 'u':
     case 'U':
       void share();
-      break;
-    case '?':
-      openShortcuts();
       break;
     case 'ArrowLeft':
     case 'ArrowRight':
@@ -337,12 +326,13 @@ const reportActivity = () => {
     const seen = visitedPresets().filter((id) => known.has(id)).length;
     recordActivity('dots', {
       progress: seen / PRESETS.length,
-      metric: { label: 'Prozkoumáno světů', value: `${seen}/${PRESETS.length}` },
-      note: s.title || undefined,
+      metric: { label: 'Prozkoumáno', value: seen, of: PRESETS.length, unit: ['svět', 'světy', 'světů'] },
+      note: s.title || null,
+      href: app.deepLink(),
     });
   }, 1500);
 };
-app.store.on(['presetId', 'title'], reportActivity);
+app.store.on(['presetId', 'title', 'recipe'], reportActivity);
 reportActivity();
 
 // debugging / measurements from the console

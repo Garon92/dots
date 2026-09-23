@@ -83,29 +83,7 @@ body.dots {
   color: #ccc;
 }
 
-/* slotted appbar actions look exactly like the kit's own appbar buttons (C-21) */
-.appbar-action {
-  --_fg: var(--g92-text-muted);
-  --_h: 44px;
-  width: 44px;
-  min-width: 44px;
-  padding: 0;
-  border: 0;
-  border-radius: 14px;
-}
 
-.appbar-action svg {
-  width: 24px;
-  height: 24px;
-  stroke-width: 2.2;
-}
-
-@media (hover: hover) {
-  .appbar-action:hover {
-    --_fg: var(--g92-text);
-    --_bg: var(--g92-surface-2);
-  }
-}
 
 /* ---------------------------------------------------------------- shared glass */
 .hud__title,
@@ -1958,7 +1936,7 @@ body.zen .coach {
 }
 
 @media (max-width: 559px) {
-  .appbar-action {
+  .dots-appbar-action {
     display: none !important;
   }
 }
@@ -2093,13 +2071,13 @@ body.zen .rec-pill {
   opacity: 0.5;
 }
 
-/* toasts float above the toolbar */
-body.dots .g92-toasts {
-  bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+/* kit toasts sit at the top below the appbar – keep them under the world-name chip / status pills */
+:root {
+  --g92-toast-offset: 50px;
 }
 
-body.dots.zen .g92-toasts {
-  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+body.dots.zen {
+  --g92-toast-offset: calc(-1 * var(--g92-appbar-total) + 6px);
 }
 
 /* short screens (landscape phones): compact coach mark */

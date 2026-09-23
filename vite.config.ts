@@ -1,7 +1,7 @@
 /// <reference types="vitest/config" />
 import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
-import { g92Pwa } from './src/kit/pwa.ts';
+import { g92NotFoundPage, g92Pwa } from './src/kit/pwa.ts';
 
 export default defineConfig({
   base: '/dots/',
@@ -12,10 +12,10 @@ export default defineConfig({
   plugins: [
     VitePWA(
       g92Pwa('dots', {
-        name: 'Dots — částicový život',
         description: 'Simulace „particle life“: barevné tečky, jedna matice sil a z ní samovolně vznikají buňky, hadi i lov.',
       }),
     ),
+    g92NotFoundPage('dots'),
   ],
   test: {
     include: ['tests/**/*.test.ts'],

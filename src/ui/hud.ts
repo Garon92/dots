@@ -1,4 +1,5 @@
 import type { App, Stats } from '../app/app';
+import { appTitle } from '../kit/apps';
 import { fmtInt, h } from './dom';
 import { icon } from './icons';
 
@@ -75,7 +76,7 @@ export class Hud {
     const s = this.app.store.state;
     this.titleText.textContent = s.title || 'Vlastní svět';
     this.badge.hidden = !s.modified;
-    document.title = `${s.title ? `${s.title} · ` : ''}Dots — částicový život`;
+    document.title = appTitle('dots', s.title || undefined);
   }
 
   private renderMeta(): void {

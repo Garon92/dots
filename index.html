@@ -1,14 +1,14 @@
 <!doctype html>
-<html lang="cs">
+<html lang="cs" class="g92-game">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <title>Dots — částicový život</title>
+    <title>Dots – Živé barevné tečky</title>
     <meta name="description" content="Simulace „particle life“: barevné tečky, jedna matice sil a z ní samovolně vznikají buňky, hadi, oběžnice i lov." />
     <link rel="icon" href="/dots/favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/dots/apple-touch-icon.png" />
     <meta name="theme-color" content="#14b8a6" />
-    <meta property="og:title" content="Dots — částicový život" />
+    <meta property="og:title" content="Dots – Živé barevné tečky" />
     <meta property="og:description" content="Z jedné matice sil samovolně vznikají buňky, hadi i lov. Hraj si s umělým životem." />
     <script>
       // avoid a white flash before the kit applies the theme
@@ -19,11 +19,7 @@
     </script>
   </head>
   <body class="g92-app dots">
-    <g92-appbar app="dots" fullscreen help>
-      <button slot="actions" type="button" class="g92-btn g92-btn--ghost g92-btn--icon appbar-action" id="btnShare" aria-label="Sdílet odkaz na tento svět" title="Sdílet odkaz (U)"></button>
-      <button slot="actions" type="button" class="g92-btn g92-btn--ghost g92-btn--icon appbar-action" id="btnShot" aria-label="Uložit obrázek" title="Uložit obrázek (C)"></button>
-      <button slot="actions" type="button" class="g92-btn g92-btn--ghost g92-btn--icon appbar-action" id="btnVideo" aria-label="Nahrát krátké video" title="Nahrát 8s video (Shift+C)"></button>
-    </g92-appbar>
+    <g92-appbar app="dots" fullscreen help keys></g92-appbar>
     <main class="stage" id="stage">
       <canvas id="field" role="img" aria-label="Simulace částicového života. Drž myš nebo prst na plátně a částice se rozprchnou."></canvas>
       <noscript><p class="noscript">Dots potřebuje zapnutý JavaScript.</p></noscript>

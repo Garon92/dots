@@ -1,6 +1,8 @@
 import type { App } from '../app/app';
 import { openDialog, type DialogHandle } from '../kit/dialog';
 import { UI_ICONS } from '../kit/dom';
+import { helpTitle } from '../kit/help';
+import { LABEL_ICONS, LABELS } from '../kit/labels';
 import { force } from '../sim/force';
 import { css } from '../state/palette';
 import { h } from './dom';
@@ -61,7 +63,7 @@ export const SHORTCUTS: { group: string; items: [string, string][] }[] = [
       ['Shift+C', 'nahrát 8s video'],
       ['U', 'zkopírovat odkaz'],
       ['A', 'promítání: galerie → evoluce → vypnout'],
-      ['?', 'tahle nápověda'],
+      ['?', 'nápověda (Jak hrát)'],
     ],
   },
 ];
@@ -97,7 +99,8 @@ export function openShortcuts(): void {
     icon: ICONS.keyboard,
     content: shortcutsContent(),
     wide: true,
-    actions: [{ label: 'Rozumím', autofocus: true }],
+    kind: 'help',
+    actions: [{ label: LABELS.gotIt, icon: LABEL_ICONS.gotIt, autofocus: true }],
     onClose: () => (open = null),
   });
 }
@@ -206,11 +209,12 @@ export function openExplainer(app: App): void {
   const keysBtn = h('button', { type: 'button', class: 'g92-btn g92-btn--ghost explain__keys', html: `${ICONS.keyboard}<span>Klávesové zkratky</span>` });
   if (fine) content.append(keysBtn);
   const d = openDialog({
-    title: 'Jak to funguje?',
+    title: helpTitle('dots'),
     icon: UI_ICONS.help,
     content,
     wide: true,
-    actions: [{ label: 'Jdu si hrát', autofocus: true }],
+    kind: 'help',
+    actions: [{ label: LABELS.gotIt, icon: LABEL_ICONS.gotIt, autofocus: true }],
   });
   keysBtn.addEventListener('click', () => {
     d.close();
@@ -234,8 +238,8 @@ export function onboarding(app: App, host: HTMLElement): HTMLElement | null {
       h('li', { html: `${ICONS.gallery}<span>V <b>Galerii</b> najdeš buňky, hady, oběžnice i lov.</span>` }),
     ),
   );
-  const ok = h('button', { type: 'button', class: 'g92-btn g92-btn--sm' }, 'Jdu na to');
-  const more = h('button', { type: 'button', class: 'g92-btn g92-btn--sm g92-btn--ghost' }, 'Jak to funguje?');
+  const ok = h('button', { type: 'button', class: 'g92-btn g92-btn--sm', html: `<span>${LABELS.intro}</span>${LABEL_ICONS.intro}` });
+  const more = h('button', { type: 'button', class: 'g92-btn g92-btn--sm g92-btn--ghost' }, helpTitle('dots'));
   const dismiss = () => {
     card.classList.add('is-leaving');
     app.updateSettings({ onboarded: true });

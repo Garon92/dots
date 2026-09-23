@@ -17,7 +17,8 @@ Simulace „particle life“: barevné tečky, jedna matice sil – a z ní samo
 - **Oblíbené** s náhledy v prohlížeči (přejmenovat, smazat s „Vrátit“, zkopírovat odkaz, záloha do souboru a nahrání zálohy). Uložené „My Setups“ ze staré verze se automaticky přenesou.
 - **Promítání**: „Galerie“ každých 24 s přepne na další svět, „Evoluce“ nechá matici pomalu samu mutovat – hodí se jako živý spořič na velkou obrazovku.
 - **Obrázek (JPEG, max. 2560 px)**, **8s video** (MP4/WebM), celá obrazovka, režim bez rozhraní (H), auto-pauza při skrytí záložky.
-- **„Jak to funguje?“** – přátelské vysvětlení principu s grafem a mini-maticí, přehled klávesových zkratek (`?`).
+- **Nápověda „Jak hrát“** (appbar ?) – přátelské vysvětlení principu s grafem a mini-maticí, přehled klávesových zkratek.
+- **Nastavení** (⚙, dialog kitu): zvuky, vzhled, animace, plátno simulace a „Smazat oblíbené a nastavení Dots“.
 - Hlídání plynulosti: když zařízení nestíhá, rovnoměrně ubere částice (dá se vypnout).
 - PWA – jde nainstalovat a funguje offline.
 

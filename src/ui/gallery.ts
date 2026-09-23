@@ -261,7 +261,7 @@ export class GalleryTab {
           'div',
           { class: 'empty-note' },
           icon('star'),
-          h('p', null, 'Zatím tu nic není. Až objevíš svět, který se ti líbí, ulož si ho tlačítkem ', h('b', null, 'Uložit svět'), ' (nebo klávesou S).'),
+          h('p', null, 'Zatím tu nic není. Až objevíš svět, který se ti líbí, ulož si ho tlačítkem ', h('b', null, 'Uložit svět'), matchMedia('(any-pointer: fine)').matches ? ' (nebo klávesou S).' : '.'),
         ),
       );
     }
