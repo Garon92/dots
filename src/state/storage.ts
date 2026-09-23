@@ -1,0 +1,161 @@
+import { createStore, type Store } from '../kit/store';
+import { randomSeed } from '../sim/rng';
+import { DEFAULT_PHYSICS } from '../sim/types';
+import { type Recipe, sanitizeRecipe } from './recipe';
+
+/**
+ * Persistent app data on top of the g92 kit store (`g92:dots:<key>`, versioned, private-mode safe).
+ *
+ *  settings   – look & tool preferences (see settings.ts)
+ *  favorites  – saved worlds with thumbnails
+ *  session    – the last world, restored when the app is opened without a link
+ *  thumbs     – cached preset preview images
+ */
+export interface Favorite {
+  id: string;
+  name: string;
+  created: number;
+  recipe: Recipe;
+  bonds?: boolean;
+  /** Small WebP/JPEG data URL. */
+  thumb?: string;
+}
+
+interface FavoritesFile {
+  v: 1;
+  items: Favorite[];
+}
+
+export interface SessionData {
+  recipe: unknown;
+  presetId: string | null;
+  favId: string | null;
+  title: string;
+}
+
+export interface ThumbCache {
+  v: number;
+  entries: Record<string, string>;
+}
+
+type DotsData = {
+  settings: unknown;
+  favorites: FavoritesFile;
+  session: SessionData | null;
+  thumbs: ThumbCache | null;
+};
+
+/** Neutral recipe used to repair broken stored data. */
+const REPAIR: Recipe = {
+  species: 6,
+  matrix: new Array<number>(36).fill(0),
+  counts: new Array<number>(6).fill(500),
+  physics: { ...DEFAULT_PHYSICS },
+  layout: 'random',
+  seed: 1,
+};
+
+let store: Store<DotsData> | null = null;
+let migratedCount = 0;
+
+export function dotsStore(): Store<DotsData> {
+  store ??= createStore<DotsData>('dots', {
+    version: 1,
+    defaults: { settings: null, favorites: { v: 1, items: [] }, session: null, thumbs: null },
+    migrate(from, m) {
+      if (from < 1) {
+        // "My Setups" of the original single-file Dots → favourites (the old key is kept untouched)
+        const legacy = m.legacyJSON<unknown>('dots.setups.v1');
+        const converted = convertLegacySetups(legacy);
+        if (converted.length) {
+          const cur = m.get('favorites');
+          const items = cur && Array.isArray(cur.items) ? cur.items : [];
+          m.set('favorites', { v: 1, items: [...items, ...converted] });
+          migratedCount = converted.length;
+        }
+      }
+    },
+  });
+  return store;
+}
+
+/** How many legacy setups were migrated during this page load (0 = none). */
+export function legacyMigrated(): number {
+  dotsStore();
+  return migratedCount;
+}
+
+export function newId(): string {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+}
+
+/** Pure: the original app's `dots.setups.v1` array → favourites. */
+export function convertLegacySetups(legacy: unknown): Favorite[] {
+  if (!Array.isArray(legacy)) return [];
+  const out: Favorite[] = [];
+  for (const su of legacy as Record<string, unknown>[]) {
+    if (!su || typeof su !== 'object') continue;
+    const phys = (su.phys && typeof su.phys === 'object' ? su.phys : {}) as Record<string, number>;
+    const recipe = sanitizeRecipe(
+      {
+        species: 6,
+        matrix: su.matrix,
+        counts: su.pop,
+        physics: { ...DEFAULT_PHYSICS, rMax: phys.rMax, friction: phys.friction, dt: phys.dt, force: phys.forceScale },
+        layout: 'random',
+        seed: randomSeed(),
+      },
+      REPAIR,
+    );
+    out.push({
+      id: newId(),
+      name: typeof su.name === 'string' && su.name.trim() ? su.name.trim().slice(0, 40) : 'Nastavení',
+      created: Date.now(),
+      recipe,
+      bonds: typeof su.bonds === 'boolean' ? su.bonds : undefined,
+    });
+  }
+  return out;
+}
+
+export function loadFavorites(): Favorite[] {
+  const file = dotsStore().get('favorites');
+  if (!file || file.v !== 1 || !Array.isArray(file.items)) return [];
+  return file.items
+    .filter((f) => f && typeof f.name === 'string')
+    .map((f) => ({
+      id: typeof f.id === 'string' ? f.id : newId(),
+      name: f.name.slice(0, 40),
+      created: typeof f.created === 'number' ? f.created : Date.now(),
+      recipe: sanitizeRecipe(f.recipe, REPAIR),
+      bonds: typeof f.bonds === 'boolean' ? f.bonds : undefined,
+      thumb: typeof f.thumb === 'string' && f.thumb.startsWith('data:image/') ? f.thumb : undefined,
+    }));
+}
+
+/** Returns false when the browser refused to store them (quota) – thumbnails are then dropped. */
+export function saveFavorites(items: Favorite[]): boolean {
+  const s = dotsStore();
+  const persisted = (value: FavoritesFile) => {
+    try {
+      return localStorage.getItem(s.keyOf('favorites')) === JSON.stringify(value);
+    } catch {
+      return false;
+    }
+  };
+  const file: FavoritesFile = { v: 1, items };
+  s.set('favorites', file);
+  if (persisted(file)) return true;
+  const slim: FavoritesFile = { v: 1, items: items.map((f, i) => (i >= 6 ? { ...f, thumb: undefined } : f)) };
+  s.set('favorites', slim);
+  return persisted(slim);
+}
+
+export function loadSession(): SessionData | null {
+  const s = dotsStore().get('session');
+  return s && typeof s === 'object' ? s : null;
+}
+
+export function saveSession(data: SessionData): void {
+  dotsStore().set('session', data);
+}
