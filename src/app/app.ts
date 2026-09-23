@@ -1010,7 +1010,7 @@ export class App {
   thumbnail(): string | undefined {
     try {
       const c = this.captureCanvas(320);
-      // crop to 16:10 around the centre
+      // crop to 16:10 – on tall (phone) or very wide screens pick the band with the most going on
       const out = document.createElement('canvas');
       out.width = 240;
       out.height = 150;
@@ -1022,7 +1022,28 @@ export class App {
         sh = c.height;
         sw = sh * ar;
       }
-      ctx.drawImage(c, (c.width - sw) / 2, (c.height - sh) / 2, sw, sh, 0, 0, 240, 150);
+      let best = { x: (c.width - sw) / 2, y: (c.height - sh) / 2, score: -1 };
+      const freeX = c.width - sw;
+      const freeY = c.height - sh;
+      if (freeX > 4 || freeY > 4) {
+        const data = c.getContext('2d')!.getImageData(0, 0, c.width, c.height).data;
+        const bg = this.store.state.theme === 'dark' ? [10, 14, 18] : [246, 243, 236];
+        for (let k = 0; k <= 6; k++) {
+          const x = Math.round((freeX * k) / 6);
+          const y = Math.round((freeY * k) / 6);
+          let score = 0;
+          for (let py = y; py < y + sh; py += 4) {
+            for (let px = x; px < x + sw; px += 4) {
+              const o = (Math.floor(py) * c.width + Math.floor(px)) * 4;
+              score += Math.abs(data[o] - bg[0]) + Math.abs(data[o + 1] - bg[1]) + Math.abs(data[o + 2] - bg[2]);
+            }
+          }
+          // slight preference for the centre
+          score *= 1 - Math.abs(k - 3) * 0.03;
+          if (score > best.score) best = { x, y, score };
+        }
+      }
+      ctx.drawImage(c, best.x, best.y, sw, sh, 0, 0, 240, 150);
       const webp = out.toDataURL('image/webp', 0.82);
       return webp.startsWith('data:image/webp') ? webp : out.toDataURL('image/jpeg', 0.82);
     } catch {

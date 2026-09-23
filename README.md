@@ -43,7 +43,16 @@ Každá tečka vidí sousedy do vzdálenosti *dosah*. Zblízka se všechny odstr
 - `src/render/` – **WebGL2** instancované kreslení do half-float bufferu (stopy nezávislé na obnovovací frekvenci, záře, vlákna jako měkké čáry, „papírový“ režim), záložní Canvas 2D; náhledy galerie se počítají v samostatném workeru.
 - `src/state/` – recepty světů, presety, URL kódování, palety, nastavení, úložiště (`g92:dots:*`).
 - `src/ui/` – panel „Laboratoř“ (boční panel / spodní šuplík na mobilu), matice, galerie, nástrojová lišta, HUD, nápověda.
-- Výkon (Apple M1 Pro, 1440×900): vykreslování stabilně 60 FPS; simulace ~3 ms na krok při 3 000 částicích (původní verze 4,5 ms na hlavním vlákně) a 60 kroků/s zvládá zhruba do 8 000 částic podle světa. Hustě shlukované světy (Buňky, Membrány) jsou náročnější.
+- **Paralelní výpočet sil**: na vícejádrových zařízeních pomáhá simulaci až 6 pomocných workerů (propojených přes MessageChannel). Částice se dělí na úseky podle odhadnuté práce – i jeden obří shluk se rozdělí mezi vlákna. Simulace sama měří, zda je rychlejší jedno vlákno, nebo pomocníci, a přepíná.
+- Výkon (Apple M1 Pro, 1440×900 @2×, vykreslování vždy stabilních 60 FPS):
+
+  | svět / částic | původní verze | nová verze |
+  |---|---|---|
+  | Oběžné řetězy 3 000 | 4,5 ms/krok (hlavní vlákno) | 1,3–1,8 ms |
+  | Oběžné řetězy 6 000 / 10 000 / 14 000 | – (max. 4 200) | 3,7 / 7,0 / 11,3 ms |
+  | Buňky (husté shluky) 3 000 / 6 000 / 10 000 | – | 2,3 / 7,2 / 20,5 ms |
+
+  60 kroků za sekundu = 16,7 ms na krok; hlídání plynulosti ubere částice, když zařízení nestíhá.
 
 ## Vývoj
 
