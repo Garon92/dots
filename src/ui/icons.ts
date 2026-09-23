@@ -52,6 +52,7 @@ export const ICONS = {
   download: wrap('<path d="M12 4v11m0 0-4-4m4 4 4-4M5 20h14"/>'),
   video: wrap('<rect x="3" y="6" width="13" height="12" rx="2.5"/><path d="m16 10.5 5-3v9l-5-3z"/>'),
   autoplay: wrap('<rect x="3" y="4.5" width="18" height="12.5" rx="2.5"/><path d="M10 8.2v5.1l4.4-2.55z" fill="currentColor"/><path d="M8 20.5h8"/>'),
+  check: wrap('<path d="m5 12.5 4.5 4.5L19 7.5"/>'),
   menu: wrap('<path d="M4 7h16M4 12h16M4 17h16"/>'),
 } as const;
 

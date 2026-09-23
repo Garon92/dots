@@ -43,6 +43,8 @@ type DotsData = {
   favorites: FavoritesFile;
   session: SessionData | null;
   thumbs: ThumbCache | null;
+  /** Ids of gallery worlds the user has opened (menu progress). */
+  visited: string[];
 };
 
 /** Neutral recipe used to repair broken stored data. */
@@ -61,7 +63,7 @@ let migratedCount = 0;
 export function dotsStore(): Store<DotsData> {
   store ??= createStore<DotsData>('dots', {
     version: 1,
-    defaults: { settings: null, favorites: { v: 1, items: [] }, session: null, thumbs: null },
+    defaults: { settings: null, favorites: { v: 1, items: [] }, session: null, thumbs: null, visited: [] },
     migrate(from, m) {
       if (from < 1) {
         // "My Setups" of the original single-file Dots → favourites (the old key is kept untouched)
@@ -169,4 +171,18 @@ export function loadSession(): SessionData | null {
 
 export function saveSession(data: SessionData): void {
   dotsStore().set('session', data);
+}
+
+export function markVisited(presetId: string): string[] {
+  const s = dotsStore();
+  const cur = Array.isArray(s.get('visited')) ? s.get('visited') : [];
+  if (cur.includes(presetId)) return cur;
+  const next = [...cur, presetId].slice(-200);
+  s.set('visited', next);
+  return next;
+}
+
+export function visitedPresets(): string[] {
+  const v = dotsStore().get('visited');
+  return Array.isArray(v) ? v.filter((x) => typeof x === 'string') : [];
 }

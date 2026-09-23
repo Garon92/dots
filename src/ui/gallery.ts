@@ -3,7 +3,7 @@ import { confirmDialog, openDialog } from '../kit/dialog';
 import { sfx } from '../kit/sfx';
 import { toast } from '../kit/toast';
 import { PRESETS, type Preset } from '../state/presets';
-import { type Favorite, favoritesBackup, sanitizeFavorites } from '../state/storage';
+import { type Favorite, favoritesBackup, markVisited, sanitizeFavorites, visitedPresets } from '../state/storage';
 import { buildHash } from '../state/url';
 import { plural } from '../kit/cz';
 import { h } from './dom';
@@ -21,6 +21,7 @@ export class GalleryTab {
   private favSection: HTMLElement;
   private favTools: HTMLElement;
   private presetCards = new Map<string, HTMLElement>();
+  private progress = h('span', { class: 'explored', title: 'Kolik světů z galerie už jsi navštívil' });
   private started = false;
 
   constructor(
@@ -82,7 +83,7 @@ export class GalleryTab {
       h('div', { class: 'gal-share' }, shareBtn, shotBtn, videoBtn),
       h('div', { class: 'gal-auto' }, h('span', { class: 'gal-auto__label' }, 'Promítání'), auto.el),
       this.favSection,
-      h('section', { class: 'sec' }, h('h3', { class: 'sec__title' }, 'Světy k objevování'), this.presetGrid),
+      h('section', { class: 'sec' }, h('h3', { class: 'sec__title sec__title--row' }, h('span', null, 'Světy k objevování'), this.progress), this.presetGrid),
     );
 
     this.renderFavorites();
@@ -110,7 +111,13 @@ export class GalleryTab {
 
   private presetCard(p: Preset): HTMLElement {
     const img = h('img', { class: 'card__img', alt: '', width: 320, height: 200, loading: 'lazy', decoding: 'async' });
-    const media = h('div', { class: 'card__media is-loading' }, img, h('span', { class: 'card__badge' }, druhu(p.species)));
+    const media = h(
+      'div',
+      { class: 'card__media is-loading' },
+      img,
+      h('span', { class: 'card__badge' }, druhu(p.species)),
+      h('span', { class: 'card__seen', title: 'Už jsi tu byl', 'aria-hidden': 'true' }, icon('check')),
+    );
     const card = h(
       'button',
       { type: 'button', class: 'wcard', 'data-id': p.id, 'aria-pressed': 'false' },
@@ -160,11 +167,16 @@ export class GalleryTab {
 
   private markActive(): void {
     const s = this.app.store.state;
+    const visited = new Set(s.presetId ? markVisited(s.presetId) : visitedPresets());
+    let seen = 0;
     for (const [id, card] of this.presetCards) {
       const on = s.presetId === id;
       card.setAttribute('aria-pressed', String(on));
       card.classList.toggle('is-modified', on && s.modified);
+      card.classList.toggle('is-visited', visited.has(id));
+      if (visited.has(id)) seen++;
     }
+    this.progress.textContent = seen >= PRESETS.length ? `všech ${seen} prozkoumáno ✨` : `prozkoumáno ${seen}/${PRESETS.length}`;
     this.favGrid.querySelectorAll<HTMLElement>('.wcard').forEach((c) => {
       const on = c.dataset.id === s.favId;
       c.setAttribute('aria-pressed', String(on));

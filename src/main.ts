@@ -7,6 +7,7 @@ import { sfx } from './kit/sfx';
 import { toast } from './kit/toast';
 import { App } from './app/app';
 import { PRESETS } from './state/presets';
+import { markVisited, visitedPresets } from './state/storage';
 import { SPEEDS } from './state/settings';
 import { segmented } from './ui/controls';
 import { h, isTypingTarget } from './ui/dom';
@@ -127,12 +128,19 @@ const share = () => shareWorld(app);
 const screenshot = () => saveScreenshot(app, stage);
 
 // ------------------------------------------------------------------ keyboard
+/** Short status toast that replaces the previous one (no stacking when keys are pressed quickly). */
+let lastFlash: (() => void) | null = null;
+function flash(msg: string, duration = 1300): void {
+  lastFlash?.();
+  lastFlash = toast(msg, { duration });
+}
+
 function stepPreset(dir: number): void {
   const s = app.store.state;
   const i = PRESETS.findIndex((p) => p.id === s.presetId);
   const next = PRESETS[(i + dir + PRESETS.length) % PRESETS.length];
   app.applyPreset(next.id);
-  toast(next.name, { duration: 1400 });
+  flash(next.name, 1400);
 }
 
 let lastTrails = app.store.state.settings.trails || 0.6;
@@ -202,7 +210,7 @@ window.addEventListener('keydown', (e) => {
     case 'b':
     case 'B':
       app.updateSettings({ bonds: !st.bonds });
-      toast(st.bonds ? 'Živá síť vypnutá' : 'Živá síť zapnutá', { duration: 1200 });
+      flash(st.bonds ? 'Živá síť vypnutá' : 'Živá síť zapnutá');
       break;
     case 't':
     case 'T':
@@ -218,7 +226,7 @@ window.addEventListener('keydown', (e) => {
     case '5': {
       const t = TOOLS[Number(k) - 1];
       app.updateSettings({ tool: t.id });
-      toast(`Nástroj: ${t.label}`, { duration: 1100 });
+      flash(`Nástroj: ${t.label}`);
       break;
     }
     case '[':
@@ -232,7 +240,7 @@ window.addEventListener('keydown', (e) => {
       const i = SPEEDS.indexOf(st.speed as (typeof SPEEDS)[number]);
       const next = SPEEDS[Math.max(0, Math.min(SPEEDS.length - 1, i + (k === '+' ? 1 : -1)))];
       app.updateSettings({ speed: next });
-      toast(`Rychlost ${String(next).replace('.', ',')}×`, { duration: 1100 });
+      flash(`Rychlost ${String(next).replace('.', ',')}×`);
       break;
     }
     case 'l':
@@ -266,7 +274,7 @@ window.addEventListener('keydown', (e) => {
       const order = ['off', 'gallery', 'evolve'] as const;
       const next = order[(order.indexOf(app.store.state.autoplay) + 1) % order.length];
       app.setAutoplay(next);
-      toast(next === 'off' ? 'Promítání vypnuto' : next === 'gallery' ? 'Promítání galerie' : 'Evoluce – matice se pomalu proměňuje', { duration: 1600 });
+      flash(next === 'off' ? 'Promítání vypnuto' : next === 'gallery' ? 'Promítání galerie' : 'Evoluce – matice se pomalu proměňuje', 1600);
       break;
     }
     case 'u':
@@ -299,13 +307,17 @@ const reportActivity = () => {
   clearTimeout(activityTimer);
   activityTimer = window.setTimeout(() => {
     const s = app.store.state;
+    if (s.presetId) markVisited(s.presetId);
+    const known = new Set(PRESETS.map((p) => p.id));
+    const seen = visitedPresets().filter((id) => known.has(id)).length;
     recordActivity('dots', {
-      metric: { label: 'Oblíbených světů', value: s.favorites.length },
+      progress: seen / PRESETS.length,
+      metric: { label: 'Prozkoumáno světů', value: `${seen}/${PRESETS.length}` },
       note: s.title || undefined,
     });
   }, 1500);
 };
-app.store.on(['favorites', 'title'], reportActivity);
+app.store.on(['presetId', 'title'], reportActivity);
 reportActivity();
 
 // debugging / measurements from the console
