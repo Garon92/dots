@@ -54,9 +54,11 @@ export class LookTab {
     const tech = h('p', { class: 'tech' });
     const renderTech = () => {
       const s = app.stats;
-      tech.textContent = `Vykreslování: ${s.renderer === 'webgl2' ? 'WebGL 2' : 'Canvas 2D'} · simulace: ${s.sim === 'worker' ? 'Web Worker' : 'hlavní vlákno'}`;
+      const sim = s.sim === 'worker' ? (s.threads > 0 ? `Web Worker + ${s.threads} pomocná vlákna` : 'Web Worker') : 'hlavní vlákno';
+      tech.textContent = `Vykreslování: ${s.renderer === 'webgl2' ? 'WebGL 2' : 'Canvas 2D'} · simulace: ${sim}`;
     };
     renderTech();
+    setInterval(renderTech, 3000);
 
     this.el = h(
       'div',

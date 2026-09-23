@@ -82,6 +82,8 @@ export interface Stats {
   simRatio: number;
   renderer: 'webgl2' | 'canvas2d';
   sim: 'worker' | 'inline';
+  /** Helper threads used by the force pass right now (0 = single thread). */
+  threads: number;
 }
 
 type Toast = (msg: string, opts?: { action?: string; onAction?: () => void; ms?: number }) => void;
@@ -183,6 +185,18 @@ export class App {
     this.darkQuery.addEventListener('change', () => this.refreshTheme());
 
     this.renderer = this.createRenderer();
+    // GPU reset / driver hiccup: rebuild the renderer when the browser gives the context back
+    this.canvas.addEventListener('webglcontextrestored', () => {
+      if (this.renderer.kind !== 'webgl2') return;
+      try {
+        this.renderer = new GLRenderer(this.canvas);
+        this.measure();
+        this.renderer.resize(this.canvas.width, this.canvas.height);
+        this.frameDirty = true;
+      } catch (err) {
+        console.warn('Dots: obnova WebGL selhala', err);
+      }
+    });
     this.client = new SimClient();
     this.client.onFrame = (r) => this.onFrame(r);
     this.client.onError = (m) => console.error('Dots: chyba simulace –', m);
@@ -194,6 +208,7 @@ export class App {
       simRatio: 1,
       renderer: this.renderer.kind,
       sim: this.client.mode,
+      threads: 0,
     };
 
     this.store.on(['settings'], (s) => {
@@ -461,6 +476,7 @@ export class App {
     this.frame = r;
     this.frameDirty = true;
     this.stats.n = r.n;
+    if (r.steps > 0) this.stats.threads = r.threads;
     if (r.steps > 0) {
       this.stats.stepMs = this.stats.stepMs * 0.85 + r.stepMs * 0.15;
       this.stats.kinetic = r.kinetic;

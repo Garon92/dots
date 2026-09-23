@@ -31,7 +31,9 @@ export type ToWorker =
   | { t: 'reseed'; counts: number[]; layout: Layout; seed: number }
   | { t: 'resize'; w: number; h: number }
   | { t: 'species'; species: number; counts: number[] }
-  | { t: 'shake'; amount: number };
+  | { t: 'shake'; amount: number }
+  /** Ports to helper workers for the parallel force pass. */
+  | { t: 'pool'; ports: MessagePort[] };
 
 export interface FrameResult {
   t: 'frame';
@@ -49,6 +51,8 @@ export interface FrameResult {
   counts: number[];
   w: number;
   h: number;
+  /** Helper workers used for the last steps (0 = single thread). */
+  threads: number;
 }
 
 export type FromWorker = FrameResult | { t: 'error'; message: string };

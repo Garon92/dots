@@ -33,8 +33,9 @@ export class World {
   vx = new Float32Array(0);
   vy = new Float32Array(0);
   sp = new Uint8Array(0);
-  private fx = new Float32Array(0);
-  private fy = new Float32Array(0);
+  /** Accumulated forces of the current step (filled by the pair pass or parallel helpers). */
+  fx = new Float32Array(0);
+  fy = new Float32Array(0);
   // scratch for the counting sort
   private x2 = new Float32Array(0);
   private y2 = new Float32Array(0);
@@ -48,9 +49,9 @@ export class World {
   // bonds ("living web")
   bondCap = 0;
   bondN = 0;
-  private bondI = new Int32Array(0);
-  private bondJ = new Int32Array(0);
-  private bondW = new Float32Array(0);
+  bondI = new Int32Array(0);
+  bondJ = new Int32Array(0);
+  bondW = new Float32Array(0);
   bondBuf = new Float32Array(0);
 
   /** Mean squared speed after the last step. */
@@ -321,27 +322,41 @@ export class World {
   private cursor = new Int32Array(0);
 
   step(opt: StepOptions, rng: Rng): void {
+    const rMax = this.prepareStep(opt, rng);
+    const bondR2 = rMax * 0.62 * (rMax * 0.62);
+    const collect = !!opt.bonds;
+    const beta = opt.physics.beta;
+    const bondN = this.grid.simpleWrap
+      ? this.pairsShifted(rMax, beta, collect, this.bondCap, bondR2)
+      : this.pairsWrapped(rMax, beta, collect, this.bondCap, bondR2);
+    this.finishStep(opt, rMax, bondN);
+  }
+
+  /** Phase 2 on this thread (symmetric pair pass). Returns the number of bonds collected. */
+  computePairs(rMax: number, beta: number, bonds: boolean): number {
+    const bondR2 = rMax * 0.62 * (rMax * 0.62);
+    return this.grid.simpleWrap
+      ? this.pairsShifted(rMax, beta, bonds, this.bondCap, bondR2)
+      : this.pairsWrapped(rMax, beta, bonds, this.bondCap, bondR2);
+  }
+
+  /**
+   * Phase 1 of a step: spawn/erase brushes, sort by cell, clear forces, size the bond buffers.
+   * Returns the effective interaction radius. After this, forces can be computed by the local
+   * pair pass or externally (parallel helpers) into `fx`, `fy` and the bond arrays.
+   */
+  prepareStep(opt: StepOptions, rng: Rng): number {
     const p = opt.physics;
     const rMax = Math.min(p.rMax, this.w / 2, this.h / 2);
-    const brushes = opt.brushes ?? [];
-    // spawning / erasing change the particle set, do them before sorting
-    for (const b of brushes) {
+    for (const b of opt.brushes ?? []) {
       if (b.mode === 'spawn') this.applySpawn(b, rng);
       else if (b.mode === 'erase') this.applyErase(b);
     }
     this.sortByCell(rMax);
     const n = this.n;
-    const { x, y, sp, fx, fy, grid, w, h } = this;
-    fx.fill(0, 0, n);
-    fy.fill(0, 0, n);
-
-    const beta = p.beta;
-    const hw = w * 0.5;
-    const hh = h * 0.5;
-
-    const collect = !!opt.bonds;
-    let bondN = 0;
-    if (collect) {
+    this.fx.fill(0, 0, n);
+    this.fy.fill(0, 0, n);
+    if (opt.bonds) {
       const want = Math.min(Math.max(1024, n * 3), 60000);
       if (this.bondCap < want) {
         this.bondCap = want;
@@ -351,20 +366,17 @@ export class World {
         this.bondBuf = new Float32Array(want * BOND_STRIDE);
       }
     }
-    const bondCap = this.bondCap;
-    const bondR2 = rMax * 0.62 * (rMax * 0.62);
-    const bondI = this.bondI;
-    const bondJ = this.bondJ;
-    const bondW = this.bondW;
+    return rMax;
+  }
 
-    if (grid.simpleWrap) {
-      bondN = this.pairsShifted(rMax, beta, collect, bondCap, bondR2);
-    } else {
-      bondN = this.pairsWrapped(rMax, beta, collect, bondCap, bondR2);
-    }
-
-    // pointer force fields
-    for (const b of brushes) {
+  /** Phase 3: pointer fields, integration, wrap-around and bond geometry. */
+  finishStep(opt: StepOptions, rMax: number, bondN: number): void {
+    const p = opt.physics;
+    const n = this.n;
+    const { x, y, sp, fx, fy, w, h } = this;
+    const hw = w * 0.5;
+    const hh = h * 0.5;
+    for (const b of opt.brushes ?? []) {
       if (b.mode === 'repel' || b.mode === 'attract' || b.mode === 'swirl') this.applyField(b);
     }
 
@@ -406,9 +418,10 @@ export class World {
     this.kinetic = n > 0 ? ke / n : 0;
 
     // bond geometry from the *integrated* positions
-    this.bondN = bondN;
-    if (collect) {
+    this.bondN = opt.bonds ? bondN : 0;
+    if (opt.bonds) {
       const out = this.bondBuf;
+      const { bondI, bondJ, bondW } = this;
       for (let k = 0; k < bondN; k++) {
         const i = bondI[k];
         const j = bondJ[k];

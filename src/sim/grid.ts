@@ -30,6 +30,8 @@ export class TorusGrid {
   /** CSR of *all* distinct neighbours (including the cell itself) – used by radius queries. */
   nbStart: Int32Array = new Int32Array(2);
   nbCells: Int32Array = new Int32Array(0);
+  /** Position offsets per neighbour entry (see fwdShift). */
+  nbShift: Float32Array = new Float32Array(0);
   /** Filled by `count()`: particles of cell c are [cellStart[c], cellStart[c+1]) after sorting. */
   cellStart: Int32Array = new Int32Array(2);
 
@@ -71,6 +73,7 @@ export class TorusGrid {
     const shift: number[] = [];
     const fwdStart = new Int32Array(nc + 1);
     const nb: number[] = [];
+    const nbShift: number[] = [];
     const nbStart = new Int32Array(nc + 1);
     const seen = new Set<number>();
     for (let cy = 0; cy < rows; cy++) {
@@ -89,6 +92,7 @@ export class TorusGrid {
             if (seen.has(d)) continue;
             seen.add(d);
             nb.push(d);
+            nbShift.push(rx < 0 ? -this.w : rx >= cols ? this.w : 0, ry < 0 ? -this.h : ry >= rows ? this.h : 0);
             if (d > c) {
               fwd.push(d);
               shift.push(rx < 0 ? -this.w : rx >= cols ? this.w : 0, ry < 0 ? -this.h : ry >= rows ? this.h : 0);
@@ -105,6 +109,7 @@ export class TorusGrid {
     this.simpleWrap = cols >= 3 && rows >= 3;
     this.nbStart = nbStart;
     this.nbCells = Int32Array.from(nb);
+    this.nbShift = Float32Array.from(nbShift);
   }
 
   /**
