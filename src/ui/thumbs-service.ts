@@ -6,7 +6,7 @@ import { dotsStore } from '../state/storage';
 
 const W = 720;
 const H = 450;
-const CACHE_VERSION = 3;
+const CACHE_VERSION = 4;
 const MAX_CACHED = 48;
 
 interface Pending {

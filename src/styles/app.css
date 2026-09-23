@@ -926,6 +926,8 @@ body.panel-open:not(.sheet-mode) .toolbar {
 .matrix {
   display: grid;
   grid-template-columns: 18px repeat(var(--S, 6), minmax(0, 1fr));
+  max-width: calc(18px + var(--S, 6) * 76px);
+  margin-inline: auto;
   gap: 4px;
   padding: 2px;
   border-radius: var(--g92-radius-sm);
@@ -1915,9 +1917,10 @@ body.zen .coach {
 /* ---------------------------------------------------------------- autoplay + recording */
 .gal-auto {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 10px;
-  padding: 6px 0 2px;
+  gap: 4px 10px;
+  padding: 8px 0 2px;
 }
 
 .gal-auto__label {
@@ -1928,7 +1931,7 @@ body.zen .coach {
 }
 
 .gal-auto .seg {
-  flex: 1;
+  flex: 1 1 240px;
   margin: 0;
 }
 
@@ -2048,4 +2051,38 @@ body.dots .g92-toasts {
 
 body.dots.zen .g92-toasts {
   bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+}
+
+/* short screens (landscape phones): compact coach mark */
+@media (max-height: 520px) {
+  .coach {
+    bottom: calc(70px + env(safe-area-inset-bottom));
+    width: min(380px, calc(100% - 24px));
+    padding: 10px 14px 10px;
+  }
+
+  .coach__title {
+    font-size: var(--g92-fs-md);
+    margin-bottom: 4px;
+  }
+
+  .coach__list {
+    gap: 3px;
+  }
+
+  .coach__list li:last-child {
+    display: none;
+  }
+
+  .coach__actions {
+    margin-top: 6px;
+  }
+
+  .coach__actions .g92-btn {
+    --_h: 36px;
+  }
+
+  .toolbar {
+    bottom: calc(8px + env(safe-area-inset-bottom));
+  }
 }

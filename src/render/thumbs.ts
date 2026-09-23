@@ -102,10 +102,11 @@ export function drawThumb(
   const size = dotRadius * 2 * Math.max(sx, sy);
   const half = size / 2;
   const sprites = colors.map((c) => sprite(c, theme));
-  ctx.globalCompositeOperation = theme === 'dark' ? 'lighter' : 'multiply';
+  // light: normal layering like paint (multiply would turn dense clusters black)
+  ctx.globalCompositeOperation = theme === 'dark' ? 'lighter' : 'source-over';
   const nf = data.frames.length;
   data.frames.forEach((f, k) => {
-    ctx.globalAlpha = nf === 1 ? 1 : (theme === 'dark' ? 0.15 : 0.1) + (theme === 'dark' ? 0.85 : 0.9) * ((k + 1) / nf) ** 3;
+    ctx.globalAlpha = (nf === 1 ? 1 : (theme === 'dark' ? 0.15 : 0.1) + (theme === 'dark' ? 0.85 : 0.9) * ((k + 1) / nf) ** 3) * (theme === 'dark' ? 1 : 0.55);
     for (let i = 0; i < f.n; i++) {
       const spr = sprites[f.spc[i]] ?? sprites[0];
       ctx.drawImage(spr, f.pos[i * 2] * sx - half, f.pos[i * 2 + 1] * sy - half, size, size);
