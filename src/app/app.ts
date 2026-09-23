@@ -217,6 +217,7 @@ export class App {
       if (theme !== s.theme) this.store.set({ theme });
     });
     this.store.on(['theme'], () => this.renderer.clear());
+    this.store.on(null, () => this.wake());
     this.store.on(['recipe', 'title', 'presetId', 'modified'], () => this.scheduleUrl());
   }
 
@@ -346,6 +347,7 @@ export class App {
       this.needSnapshot = true;
     }
     this.renderer.clear();
+    this.wake();
   }
 
   /** Default particle count for the current world at a density multiplier. */
@@ -414,12 +416,24 @@ export class App {
     }
     if (s.running) this.trackDesired(now, dt * speed);
 
-    // draw
+    // draw – while paused and nothing changes, stop redrawing once the trails have settled
+    // (the last picture stays on screen; saves battery)
     if (this.bloom < 1 && this.frame) this.bloom = Math.min(1, this.bloom + dt / 900);
-    this.renderer.draw(this.frameDirty ? this.frame : null, this.look(), dt);
-    this.onAfterDraw?.(this.canvas);
-    this.frameDirty = false;
+    const busy = s.running || this.frameDirty || this.brushes.size > 0 || this.morphDur > 0 || this.bloom < 1 || this.onAfterDraw !== null;
+    if (busy) this.idleUntil = now + 2500;
+    if (now < this.idleUntil) {
+      this.renderer.draw(this.frameDirty ? this.frame : null, this.look(), dt);
+      this.onAfterDraw?.(this.canvas);
+      this.frameDirty = false;
+    }
   };
+
+  private idleUntil = 0;
+
+  /** Force a few seconds of redraws (settings changed while paused, resize, …). */
+  wake(): void {
+    this.idleUntil = performance.now() + 2500;
+  }
 
   private look(): LookParams {
     const s = this.store.state;
