@@ -6,7 +6,7 @@ import type { FrameResult } from '../sim/protocol';
 import { mulberry32, randomSeed, type Rng } from '../sim/rng';
 import { type Brush, clamp, clampPhysics, type Layout, type Physics } from '../sim/types';
 import { getPalette, speciesColors } from '../state/palette';
-import { DEFAULT_PRESET_ID, getPreset, type Preset, presetPhysics } from '../state/presets';
+import { DEFAULT_PRESET_ID, getPreset, type Preset, PRESETS, presetPhysics } from '../state/presets';
 import {
   clampSpecies,
   cloneRecipe,
@@ -48,6 +48,9 @@ const STEP_MS = 1000 / 60;
 const MORPH_MS = 700;
 
 export type TabId = 'matice' | 'galerie' | 'svet' | 'vzhled';
+/** Hands-free modes: walk through the gallery, or let the matrix slowly evolve. */
+export type Autoplay = 'off' | 'gallery' | 'evolve';
+export const AUTO_MS: Record<Exclude<Autoplay, 'off'>, number> = { gallery: 24000, evolve: 9000 };
 
 export interface AppState {
   recipe: Recipe;
@@ -67,6 +70,7 @@ export interface AppState {
   canRedo: boolean;
   /** Selected matrix cell (row*species+col) or −1. */
   selCell: number;
+  autoplay: Autoplay;
 }
 
 export interface Stats {
@@ -134,6 +138,8 @@ export class App {
   keHead = 0;
   toast: Toast = () => {};
   onFrameStats: (s: Stats) => void = () => {};
+  /** Called right after every draw while the drawing buffer is still valid (video capture). */
+  onAfterDraw: ((canvas: HTMLCanvasElement) => void) | null = null;
   /** Fired every animation frame while the matrix is morphing (for the editor). */
   onMatrixFrame: () => void = () => {};
   private urlTimer = 0;
@@ -169,6 +175,7 @@ export class App {
       canUndo: false,
       canRedo: false,
       selCell: -1,
+      autoplay: 'off',
     });
     this.store.set({ theme: this.resolveTheme(settings.canvasTheme) });
     // canvas theme "auto" follows the global g92 theme (which itself may follow the OS)
@@ -363,6 +370,13 @@ export class App {
     }
 
     this.updateMorph(now);
+    if (s.autoplay !== 'off' && s.running) {
+      this.autoMs += dt;
+      if (this.autoMs >= AUTO_MS[s.autoplay]) {
+        this.autoMs = 0;
+        this.autoStep(s.autoplay);
+      }
+    }
 
     const speed = s.settings.speed;
     if (s.running) this.acc += dt * speed;
@@ -388,6 +402,7 @@ export class App {
     // draw
     if (this.bloom < 1 && this.frame) this.bloom = Math.min(1, this.bloom + dt / 900);
     this.renderer.draw(this.frameDirty ? this.frame : null, this.look(), dt);
+    this.onAfterDraw?.(this.canvas);
     this.frameDirty = false;
   };
 
@@ -577,6 +592,8 @@ export class App {
   }
 
   private pushHistory(): void {
+    // any edit by the user ends the hands-free mode
+    if (!this.autoAction && this.store.state.autoplay !== 'off') this.setAutoplay('off');
     this.undoStack.push(this.snapshot());
     if (this.undoStack.length > 60) this.undoStack.shift();
     this.redoStack = [];
@@ -606,6 +623,41 @@ export class App {
     } else {
       this.store.set({ recipe: { ...r, matrix: s.matrix.slice() }, modified: true });
       this.morphTo_(s.matrix, 300);
+    }
+  }
+
+  // ------------------------------------------------------------------ autoplay
+
+  private autoMs = 0;
+  private autoAction = false;
+
+  setAutoplay(mode: Autoplay): void {
+    this.autoMs = 0;
+    this.store.set({ autoplay: mode });
+    if (mode !== 'off' && !this.store.state.running) this.togglePause(true);
+  }
+
+  /** 0…1 progress to the next automatic change. */
+  get autoProgress(): number {
+    const a = this.store.state.autoplay;
+    return a === 'off' ? 0 : Math.min(1, this.autoMs / AUTO_MS[a]);
+  }
+
+  private autoStep(mode: Exclude<Autoplay, 'off'>): void {
+    this.autoAction = true;
+    try {
+      if (mode === 'gallery') {
+        const i = PRESETS.findIndex((p) => p.id === this.store.state.presetId);
+        this.applyPreset(PRESETS[(i + 1) % PRESETS.length].id);
+      } else {
+        const r = this.store.state.recipe;
+        this.pushHistory();
+        this.touch({ ...r, matrix: mutateMatrix(r.matrix, r.species, this.rng, 0.22, 0.22) });
+        this.morphTo_(this.store.state.recipe.matrix, 3500);
+        if (this.store.state.title !== 'Evoluce') this.store.set({ title: 'Evoluce', presetId: null, favId: null, modified: false });
+      }
+    } finally {
+      this.autoAction = false;
     }
   }
 

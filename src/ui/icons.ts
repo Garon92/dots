@@ -50,6 +50,8 @@ export const ICONS = {
   info: wrap('<circle cx="12" cy="12" r="9"/><path d="M12 11v5.5"/><circle cx="12" cy="7.8" r=".6" fill="currentColor"/>'),
   reset: wrap('<path d="M4 12a8 8 0 1 0 2.3-5.7L4 8.5"/><path d="M4 4v4.5h4.5"/>'),
   download: wrap('<path d="M12 4v11m0 0-4-4m4 4 4-4M5 20h14"/>'),
+  video: wrap('<rect x="3" y="6" width="13" height="12" rx="2.5"/><path d="m16 10.5 5-3v9l-5-3z"/>'),
+  autoplay: wrap('<rect x="3" y="4.5" width="18" height="12.5" rx="2.5"/><path d="M10 8.2v5.1l4.4-2.55z" fill="currentColor"/><path d="M8 20.5h8"/>'),
   menu: wrap('<path d="M4 7h16M4 12h16M4 17h16"/>'),
 } as const;
 

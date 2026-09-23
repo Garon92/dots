@@ -29,7 +29,9 @@ export async function shareWorld(app: App): Promise<void> {
 export async function saveScreenshot(app: App, stage: HTMLElement): Promise<void> {
   const c = app.captureCanvas();
   const title = (app.store.state.title || 'dots').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-  const stamp = new Date().toISOString().slice(0, 16).replace(/[T:]/g, '-');
+  const d = new Date();
+  const p2 = (n: number) => String(n).padStart(2, '0');
+  const stamp = `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}-${p2(d.getHours())}${p2(d.getMinutes())}`;
   const name = `dots-${title || 'svet'}-${stamp}.png`;
   const blob = await new Promise<Blob | null>((res) => c.toBlob(res, 'image/png'));
   if (!blob) {

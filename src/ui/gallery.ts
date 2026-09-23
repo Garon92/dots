@@ -7,6 +7,8 @@ import type { Favorite } from '../state/storage';
 import { buildHash } from '../state/url';
 import { plural } from '../kit/cz';
 import { h } from './dom';
+import { segmented } from './controls';
+import type { Autoplay } from '../app/app';
 import { icon } from './icons';
 import type { ThumbService } from './thumbs-service';
 
@@ -23,7 +25,7 @@ export class GalleryTab {
   constructor(
     private app: App,
     private thumbs: ThumbService,
-    actions: { share: () => void; shot: () => void },
+    actions: { share: () => void; shot: () => void; video: (() => void) | null },
   ) {
     const surprise = h(
       'button',
@@ -37,10 +39,25 @@ export class GalleryTab {
     });
     const save = h('button', { type: 'button', class: 'g92-btn gal-cta', title: 'Uložit tento svět do oblíbených (S)' }, icon('star'), 'Uložit svět');
     save.addEventListener('click', () => this.saveDialog());
-    const shareBtn = h('button', { type: 'button', class: 'g92-btn g92-btn--secondary gal-cta', title: 'Zkopírovat odkaz na tento svět (U)' }, icon('share'), 'Sdílet');
+    const shareBtn = h('button', { type: 'button', class: 'g92-btn g92-btn--secondary g92-btn--sm gal-cta', title: 'Zkopírovat odkaz na tento svět (U)' }, icon('share'), 'Sdílet');
     shareBtn.addEventListener('click', () => actions.share());
-    const shotBtn = h('button', { type: 'button', class: 'g92-btn g92-btn--secondary gal-cta', title: 'Uložit obrázek plátna (C)' }, icon('camera'), 'Obrázek');
+    const shotBtn = h('button', { type: 'button', class: 'g92-btn g92-btn--secondary g92-btn--sm gal-cta', title: 'Uložit obrázek plátna (C)' }, icon('camera'), 'Obrázek');
     shotBtn.addEventListener('click', () => actions.shot());
+    const videoBtn = actions.video
+      ? h('button', { type: 'button', class: 'g92-btn g92-btn--secondary g92-btn--sm gal-cta', title: 'Nahrát krátké video (Shift+C)' }, icon('video'), 'Video')
+      : null;
+    videoBtn?.addEventListener('click', () => actions.video?.());
+    const auto = segmented<Autoplay>(
+      'Promítání',
+      [
+        { value: 'off', label: 'Vypnuto' },
+        { value: 'gallery', label: 'Galerie', icon: 'autoplay', title: 'Každých 24 s další svět (A)' },
+        { value: 'evolve', label: 'Evoluce', icon: 'mutate', title: 'Matice se pomalu sama proměňuje (A)' },
+      ],
+      app.store.state.autoplay,
+      (v) => app.setAutoplay(v),
+    );
+    app.store.on(['autoplay'], (st) => auto.set(st.autoplay));
 
     this.favGrid = h('div', { class: 'cards' });
     this.favSection = h(
@@ -55,7 +72,9 @@ export class GalleryTab {
     this.el = h(
       'div',
       { class: 'tab-page', id: 'tab-galerie' },
-      h('div', { class: 'gal-top' }, surprise, save, shareBtn, shotBtn),
+      h('div', { class: 'gal-top' }, surprise, save),
+      h('div', { class: 'gal-share' }, shareBtn, shotBtn, videoBtn),
+      h('div', { class: 'gal-auto' }, h('span', { class: 'gal-auto__label' }, 'Promítání'), auto.el),
       this.favSection,
       h('section', { class: 'sec' }, h('h3', { class: 'sec__title' }, 'Světy k objevování'), this.presetGrid),
     );

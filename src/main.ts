@@ -22,6 +22,7 @@ import { ThumbService } from './ui/thumbs-service';
 import { TOOLS, Toolbar } from './ui/toolbar';
 import { WorldTab } from './ui/world-tab';
 import { saveScreenshot, shareWorld } from './ui/share';
+import { Recorder } from './ui/record';
 
 const stage = document.getElementById('stage')!;
 const canvas = document.getElementById('field') as HTMLCanvasElement;
@@ -34,7 +35,12 @@ app.toast = (msg, o) => {
 
 // ------------------------------------------------------------------ UI
 const thumbs = new ThumbService();
-const gallery = new GalleryTab(app, thumbs, { share: () => void share(), shot: () => void screenshot() });
+const recorder = new Recorder(app);
+const gallery = new GalleryTab(app, thumbs, {
+  share: () => void share(),
+  shot: () => void screenshot(),
+  video: Recorder.supported() ? () => recorder.toggle() : null,
+});
 const matrix = new MatrixTab(app);
 const world = new WorldTab(app);
 const look = new LookTab(app);
@@ -49,17 +55,21 @@ const toolbar = new Toolbar(app);
 const input = new CanvasInput(app, app.canvasEl);
 const zenBtn = h('button', { type: 'button', class: 'zen-exit', 'aria-label': 'Zobrazit rozhraní', title: 'Zobrazit rozhraní (H)' }, icon('eye'));
 zenBtn.addEventListener('click', () => setZen(false));
-stage.append(input.ring, hud.el, hud.paused, toolbar.el, panel.el, zenBtn);
+stage.append(input.ring, hud.el, recorder.pill, hud.paused, toolbar.el, panel.el, zenBtn);
 // generate gallery previews in the background once the page settled
 setTimeout(() => gallery.activate(), 2500);
 
 // appbar actions
 const shareBtn = document.getElementById('btnShare')!;
 const shotBtn = document.getElementById('btnShot')!;
+const videoBtn = document.getElementById('btnVideo')!;
 shareBtn.append(icon('share'));
 shotBtn.append(icon('camera'));
+videoBtn.append(icon('video'));
 shareBtn.addEventListener('click', () => void share());
 shotBtn.addEventListener('click', () => void screenshot());
+videoBtn.addEventListener('click', () => recorder.toggle());
+if (!Recorder.supported()) videoBtn.hidden = true;
 appbar.addEventListener('g92-help', () => openExplainer(app));
 appbar.addEventListener('g92-settings', (e) => {
   e.preventDefault();
@@ -241,9 +251,19 @@ window.addEventListener('keydown', (e) => {
       gallery.saveDialog();
       break;
     case 'c':
-    case 'C':
       void screenshot();
       break;
+    case 'C':
+      recorder.toggle();
+      break;
+    case 'a':
+    case 'A': {
+      const order = ['off', 'gallery', 'evolve'] as const;
+      const next = order[(order.indexOf(app.store.state.autoplay) + 1) % order.length];
+      app.setAutoplay(next);
+      toast(next === 'off' ? 'Promítání vypnuto' : next === 'gallery' ? 'Promítání galerie' : 'Evoluce – matice se pomalu proměňuje', { duration: 1600 });
+      break;
+    }
     case 'u':
     case 'U':
       void share();

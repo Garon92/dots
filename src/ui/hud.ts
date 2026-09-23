@@ -15,6 +15,10 @@ export class Hud {
   private spark: HTMLCanvasElement;
   private sctx: CanvasRenderingContext2D;
   readonly paused: HTMLButtonElement;
+  private auto: HTMLButtonElement;
+  private autoFill: HTMLElement;
+  private autoLabel: HTMLElement;
+  private raf = 0;
 
   constructor(private app: App) {
     this.titleText = h('span', { class: 'hud__name' });
@@ -35,7 +39,11 @@ export class Hud {
       h('span', { class: 'hud__stat hud__stat--spark' }, h('small', null, 'Pohyb'), this.spark),
       this.lag,
     );
-    this.el = h('div', { class: 'hud' }, this.title, this.stats);
+    this.autoFill = h('i', { class: 'hud__auto-fill' });
+    this.autoLabel = h('span', null, '');
+    this.auto = h('button', { type: 'button', class: 'hud__auto', hidden: true, title: 'Zastavit promítání (A)' }, icon('autoplay'), this.autoLabel, h('span', { class: 'hud__auto-bar' }, this.autoFill));
+    this.auto.addEventListener('click', () => app.setAutoplay('off'));
+    this.el = h('div', { class: 'hud' }, this.title, this.auto, this.stats);
 
     this.paused = h('button', { type: 'button', class: 'paused-pill', hidden: true }, icon('play'), h('span', null, 'Pozastaveno'), h('kbd', null, 'mezerník'));
     this.paused.addEventListener('click', () => app.togglePause(true));
@@ -43,6 +51,12 @@ export class Hud {
     app.store.on(['title', 'modified'], () => this.renderTitle());
     app.store.on(['settings', 'recipe', 'theme'], () => this.renderMeta());
     app.store.on(['running'], (s) => (this.paused.hidden = s.running));
+    app.store.on(['autoplay'], (s) => {
+      this.auto.hidden = s.autoplay === 'off';
+      this.autoLabel.textContent = s.autoplay === 'gallery' ? 'Promítání galerie' : 'Evoluce';
+      cancelAnimationFrame(this.raf);
+      if (s.autoplay !== 'off') this.tickAuto();
+    });
     const prev = app.onFrameStats;
     app.onFrameStats = (st) => {
       prev(st);
@@ -51,6 +65,11 @@ export class Hud {
     this.renderTitle();
     this.renderMeta();
   }
+
+  private tickAuto = () => {
+    this.autoFill.style.transform = `scaleX(${this.app.autoProgress})`;
+    this.raf = requestAnimationFrame(this.tickAuto);
+  };
 
   private renderTitle(): void {
     const s = this.app.store.state;
