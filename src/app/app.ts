@@ -973,6 +973,19 @@ export class App {
     this.store.set({ favorites });
   }
 
+  /** Merge imported favourites (skips exact duplicates). Returns how many were added. */
+  importFavorites(items: Favorite[]): number {
+    const cur = this.store.state.favorites;
+    const sig = (f: Favorite) => `${f.name}|${f.recipe.species}|${f.recipe.matrix.join(',')}`;
+    const seen = new Set(cur.map(sig));
+    const add = items.filter((f) => !seen.has(sig(f))).map((f) => ({ ...f, id: newId() }));
+    if (add.length === 0) return 0;
+    const favorites = [...add, ...cur];
+    if (!saveFavorites(favorites)) this.toast('Úložiště prohlížeče je plné – některé náhledy se neuložily.');
+    this.store.set({ favorites });
+    return add.length;
+  }
+
   renameFavorite(id: string, name: string): void {
     const favorites = this.store.state.favorites.map((f) => (f.id === id ? { ...f, name: name.trim().slice(0, 40) || f.name } : f));
     saveFavorites(favorites);

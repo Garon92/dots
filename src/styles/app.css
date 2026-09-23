@@ -2086,3 +2086,38 @@ body.dots.zen .g92-toasts {
     bottom: calc(8px + env(safe-area-inset-bottom));
   }
 }
+
+.sec__title--row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.sec__tools {
+  display: inline-flex;
+  gap: 4px;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.link-btn {
+  min-height: 32px;
+  padding: 2px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--accent-text);
+  font: inherit;
+  font-size: var(--g92-fs-xs);
+  font-weight: var(--g92-fw-bold);
+  cursor: pointer;
+}
+
+.link-btn:hover {
+  background: var(--accent-softer);
+}
+
+.link-btn[hidden] {
+  display: none;
+}

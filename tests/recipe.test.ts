@@ -121,3 +121,22 @@ describe('legacy "My Setups" migration', () => {
     expect(convertLegacySetups('nope')).toEqual([]);
   });
 });
+
+describe('favourites backup', () => {
+  it('round-trips through the backup file and rejects junk', async () => {
+    const { favoritesBackup, sanitizeFavorites } = await import('../src/state/storage');
+    const fav = {
+      id: 'abc',
+      name: 'Můj svět',
+      created: 1700000000000,
+      recipe: { ...fallback, matrix: [0.5, -0.5, 0, 0, 1, -1, 0.25, 0.75, 0] },
+      bonds: true,
+      thumb: 'data:image/webp;base64,AAAA',
+    };
+    const back = sanitizeFavorites(JSON.parse(favoritesBackup([fav])));
+    expect(back).toEqual([fav]);
+    expect(sanitizeFavorites({ v: 1, items: [{ name: 'x', thumb: 'javascript:alert(1)' }] })[0]!.thumb).toBeUndefined();
+    expect(sanitizeFavorites({ v: 2, items: [fav] })).toEqual([]);
+    expect(sanitizeFavorites('nope')).toEqual([]);
+  });
+});

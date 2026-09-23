@@ -119,18 +119,29 @@ export function convertLegacySetups(legacy: unknown): Favorite[] {
 }
 
 export function loadFavorites(): Favorite[] {
-  const file = dotsStore().get('favorites');
-  if (!file || file.v !== 1 || !Array.isArray(file.items)) return [];
-  return file.items
-    .filter((f) => f && typeof f.name === 'string')
-    .map((f) => ({
-      id: typeof f.id === 'string' ? f.id : newId(),
-      name: f.name.slice(0, 40),
-      created: typeof f.created === 'number' ? f.created : Date.now(),
-      recipe: sanitizeRecipe(f.recipe, REPAIR),
-      bonds: typeof f.bonds === 'boolean' ? f.bonds : undefined,
-      thumb: typeof f.thumb === 'string' && f.thumb.startsWith('data:image/') ? f.thumb : undefined,
+  return sanitizeFavorites(dotsStore().get('favorites'));
+}
+
+/** Validate a favourites file (from storage or an imported backup). */
+export function sanitizeFavorites(file: unknown): Favorite[] {
+  const f = file as Partial<FavoritesFile> | null;
+  if (!f || f.v !== 1 || !Array.isArray(f.items)) return [];
+  return f.items
+    .filter((x): x is Favorite => !!x && typeof x === 'object' && typeof (x as Favorite).name === 'string')
+    .slice(0, 500)
+    .map((x) => ({
+      id: typeof x.id === 'string' ? x.id.slice(0, 40) : newId(),
+      name: x.name.slice(0, 40),
+      created: typeof x.created === 'number' ? x.created : Date.now(),
+      recipe: sanitizeRecipe(x.recipe, REPAIR),
+      bonds: typeof x.bonds === 'boolean' ? x.bonds : undefined,
+      thumb: typeof x.thumb === 'string' && /^data:image\/(webp|jpeg|png);base64,/.test(x.thumb) && x.thumb.length < 200_000 ? x.thumb : undefined,
     }));
+}
+
+/** Backup file content for download. */
+export function favoritesBackup(items: Favorite[]): string {
+  return JSON.stringify({ app: 'dots', v: 1, exported: new Date().toISOString(), items } satisfies FavoritesFile & { app: string; exported: string });
 }
 
 /** Returns false when the browser refused to store them (quota) – thumbnails are then dropped. */

@@ -3,7 +3,7 @@ import { confirmDialog, openDialog } from '../kit/dialog';
 import { sfx } from '../kit/sfx';
 import { toast } from '../kit/toast';
 import { PRESETS, type Preset } from '../state/presets';
-import type { Favorite } from '../state/storage';
+import { type Favorite, favoritesBackup, sanitizeFavorites } from '../state/storage';
 import { buildHash } from '../state/url';
 import { plural } from '../kit/cz';
 import { h } from './dom';
@@ -19,6 +19,7 @@ export class GalleryTab {
   private presetGrid: HTMLElement;
   private favGrid: HTMLElement;
   private favSection: HTMLElement;
+  private favTools: HTMLElement;
   private presetCards = new Map<string, HTMLElement>();
   private started = false;
 
@@ -60,10 +61,15 @@ export class GalleryTab {
     app.store.on(['autoplay'], (st) => auto.set(st.autoplay));
 
     this.favGrid = h('div', { class: 'cards' });
+    const backup = h('button', { type: 'button', class: 'link-btn', title: 'Stáhnout oblíbené světy jako soubor (záloha / přenos do jiného zařízení)' }, 'Zálohovat');
+    backup.addEventListener('click', () => this.exportFavorites());
+    const restore = h('button', { type: 'button', class: 'link-btn', title: 'Nahrát oblíbené ze souboru zálohy' }, 'Nahrát zálohu');
+    restore.addEventListener('click', () => this.importFavorites());
+    this.favTools = h('span', { class: 'sec__tools' }, backup, restore);
     this.favSection = h(
       'section',
       { class: 'sec' },
-      h('h3', { class: 'sec__title' }, 'Moje oblíbené'),
+      h('h3', { class: 'sec__title sec__title--row' }, h('span', null, 'Moje oblíbené'), this.favTools),
       this.favGrid,
     );
     this.presetGrid = h('div', { class: 'cards' });
@@ -166,8 +172,54 @@ export class GalleryTab {
     });
   }
 
+  private exportFavorites(): void {
+    const favs = this.app.store.state.favorites;
+    if (favs.length === 0) {
+      toast('Zatím nemáš žádné oblíbené světy.');
+      return;
+    }
+    const blob = new Blob([favoritesBackup(favs)], { type: 'application/json' });
+    const a = h('a', { href: URL.createObjectURL(blob), download: `dots-oblibene-${new Date().toISOString().slice(0, 10)}.json` });
+    document.body.append(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    toast(`Záloha stažena (${favs.length})`, { variant: 'success' });
+  }
+
+  private importFavorites(): void {
+    const input = h('input', { type: 'file', accept: 'application/json,.json', hidden: true });
+    input.addEventListener('change', () => {
+      const file = input.files?.[0];
+      input.remove();
+      if (!file) return;
+      if (file.size > 20_000_000) {
+        toast('Soubor je příliš velký.', { variant: 'danger' });
+        return;
+      }
+      void file.text().then((text) => {
+        let items: Favorite[] = [];
+        try {
+          items = sanitizeFavorites(JSON.parse(text));
+        } catch {
+          items = [];
+        }
+        if (items.length === 0) {
+          toast('V souboru nejsou žádné světy z Dots.', { variant: 'danger' });
+          return;
+        }
+        const added = this.app.importFavorites(items);
+        toast(added ? `Přidáno světů: ${added}` : 'Všechny světy už v oblíbených máš.', { variant: added ? 'success' : 'default' });
+        if (added && this.started) this.loadThumbs();
+      });
+    });
+    document.body.append(input);
+    input.click();
+  }
+
   private renderFavorites(): void {
     const favs = this.app.store.state.favorites;
+    (this.favTools.firstElementChild as HTMLElement).hidden = favs.length === 0;
     this.favGrid.replaceChildren();
     if (favs.length === 0) {
       this.favGrid.append(
