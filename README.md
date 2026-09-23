@@ -14,8 +14,9 @@ Simulace „particle life“: barevné tečky, jedna matice sil – a z ní samo
 - **Nástroje na plátně**: odpuzovat, přitahovat, vířit, přidávat částice (vybraného druhu), gumovat; velikost štětce.
 - **Vzhled**: plátno „Noc“ (zářící tečky) nebo „Papír“ (inkoust na papíře), 4 barevné palety, stopy, záře, velikost teček, **živá síť** (vlákna mezi přitahujícími se částicemi), vinětace, měřítko světa.
 - **Sdílení odkazem** – celý svět (matice, počty, fyzika, rozmístění) je zakódovaný v adrese (~80 znaků).
-- **Oblíbené** s náhledy v prohlížeči (přejmenovat, smazat s „Vrátit“, zkopírovat odkaz). Uložené „My Setups“ ze staré verze se automaticky přenesou.
-- **Obrázek do PNG**, celá obrazovka, režim bez rozhraní (H), auto-pauza při skrytí záložky.
+- **Oblíbené** s náhledy v prohlížeči (přejmenovat, smazat s „Vrátit“, zkopírovat odkaz, záloha do souboru a nahrání zálohy). Uložené „My Setups“ ze staré verze se automaticky přenesou.
+- **Promítání**: „Galerie“ každých 24 s přepne na další svět, „Evoluce“ nechá matici pomalu samu mutovat – hodí se jako živý spořič na velkou obrazovku.
+- **Obrázek do PNG**, **8s video** (MP4/WebM), celá obrazovka, režim bez rozhraní (H), auto-pauza při skrytí záložky.
 - **„Jak to funguje?“** – přátelské vysvětlení principu s grafem a mini-maticí, přehled klávesových zkratek (`?`).
 - Hlídání plynulosti: když zařízení nestíhá, rovnoměrně ubere částice (dá se vypnout).
 - PWA – jde nainstalovat a funguje offline.
@@ -30,7 +31,7 @@ Simulace „particle life“: barevné tečky, jedna matice sil – a z ní samo
 | změna síly v matici | táhnout buňku ↕, kolečko, šipky + Shift | táhnout buňku ↕ |
 | přesná hodnota | kliknout na číslo u posuvníku a napsat (i s desetinnou čárkou) | totéž |
 
-Klávesy: `mezerník` pauza · `.` krok · `R` náhodná matice · `Shift+R` překvapení · `M` zmutovat · `Y` souměrná · `I` obrátit · `X` prohodit · `0` vynulovat · `Ctrl+Z/Y` zpět/znovu · `N` rozmístit · `V` rozfoukat · `1–5` nástroje · `[` `]` štětec · `+` `−` rychlost · `←` `→` předchozí/další svět · `B` živá síť · `T` stopy · `L` laboratoř · `G` galerie · `H` skrýt rozhraní · `F` celá obrazovka · `S` uložit · `C` obrázek · `U` odkaz · `?` nápověda.
+Klávesy: `mezerník` pauza · `.` krok · `R` náhodná matice · `Shift+R` překvapení · `M` zmutovat · `Y` souměrná · `I` obrátit · `X` prohodit · `0` vynulovat · `Ctrl+Z/Y` zpět/znovu · `N` rozmístit · `V` rozfoukat · `1–5` nástroje · `[` `]` štětec · `+` `−` rychlost · `←` `→` předchozí/další svět · `B` živá síť · `T` stopy · `L` laboratoř · `G` galerie · `H` skrýt rozhraní · `F` celá obrazovka · `S` uložit · `C` obrázek · `Shift+C` video · `U` odkaz · `A` promítání · `?` nápověda.
 
 ## Jak to funguje
 
