@@ -59,6 +59,7 @@ uniform float u_width;
 uniform vec3 u_colors[8];
 out float v_across;
 out vec3 v_col;
+out float v_w;
 void main() {
   vec2 p1 = a_seg.xy;
   vec2 d = a_seg.zw - p1;
@@ -70,7 +71,8 @@ void main() {
   int packed = int(a_sp + 0.5);
   int si = (packed >> 3) & 7;
   int sj = packed & 7;
-  v_col = mix(u_colors[si], u_colors[sj], a_q.x) * a_w;
+  v_col = mix(u_colors[si], u_colors[sj], a_q.x);
+  v_w = a_w;
   v_across = a_q.y;
 }`;
 
@@ -78,12 +80,13 @@ const BOND_FS = `#version 300 es
 precision mediump float;
 in float v_across;
 in vec3 v_col;
+in float v_w;
 uniform float u_alpha;
 out vec4 o;
 void main() {
   float a = 1.0 - abs(v_across);
-  a *= a;
-  o = vec4(v_col * a * u_alpha, a * u_alpha);
+  float k = a * a * u_alpha * v_w;
+  o = vec4(v_col * k, k);
 }`;
 
 const FULL_VS = `#version 300 es

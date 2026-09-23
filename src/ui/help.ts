@@ -6,67 +6,71 @@ import { css } from '../state/palette';
 import { h } from './dom';
 import { ICONS } from './icons';
 
-export const SHORTCUTS: { group: string; items: [string[], string][] }[] = [
+/** Key notation: "Ctrl+Z" = combination, "←/→" = alternatives, "~text" = plain words. */
+export const SHORTCUTS: { group: string; items: [string, string][] }[] = [
   {
     group: 'Simulace',
     items: [
-      [['Mezerník'], 'pauza / pokračovat'],
-      [['.'], 'jeden krok (při pauze)'],
-      [['N'], 'rozmístit částice znovu'],
-      [['V'], 'rozfoukat (náhodný šťouchanec)'],
-      [['←', '→'], 'předchozí / další svět z galerie'],
+      ['Mezerník', 'pauza / pokračovat'],
+      ['.', 'jeden krok (při pauze)'],
+      ['N', 'rozmístit částice znovu'],
+      ['V', 'rozfoukat (náhodný šťouchanec)'],
+      ['+/−', 'rychlejší / pomalejší simulace'],
+      ['←/→', 'předchozí / další svět z galerie'],
     ],
   },
   {
     group: 'Matice',
     items: [
-      [['R'], 'náhodná matice'],
-      [['Shift', 'R'], 'překvapení – náhodný celý svět'],
-      [['M'], 'zmutovat (malá změna)'],
-      [['Y'], 'souměrná matice'],
-      [['I'], 'obrátit znaménka'],
-      [['X'], 'prohodit role (transponovat)'],
-      [['0'], 'vynulovat'],
-      [['Ctrl', 'Z'], 'zpět'],
-      [['Ctrl', 'Y'], 'znovu'],
+      ['R', 'náhodná matice'],
+      ['Shift+R', 'překvapení – náhodný celý svět'],
+      ['M', 'zmutovat (malá změna)'],
+      ['Y', 'souměrná matice'],
+      ['I', 'obrátit znaménka'],
+      ['X', 'prohodit role (transponovat)'],
+      ['0', 'vynulovat'],
+      ['Ctrl+Z', 'zpět'],
+      ['Ctrl+Y', 'znovu'],
     ],
   },
   {
     group: 'Nástroje na plátně',
     items: [
-      [['1'], 'odpuzovat'],
-      [['2'], 'přitahovat'],
-      [['3'], 'vířit'],
-      [['4'], 'přidávat částice'],
-      [['5'], 'gumovat'],
-      [['Shift', '+ tah'], 'přitahovat (s jakýmkoli nástrojem)'],
-      [['pravé tlačítko'], 'opačná síla'],
-      [['kolečko'], 'velikost štětce'],
-      [['[', ']'], 'menší / větší štětec'],
+      ['1', 'odpuzovat'],
+      ['2', 'přitahovat'],
+      ['3', 'vířit'],
+      ['4', 'přidávat částice'],
+      ['5', 'gumovat'],
+      ['Shift+~tah', 'přitahovat s jakýmkoli nástrojem'],
+      ['~pravé tlačítko', 'opačná síla'],
+      ['[/]', 'menší / větší štětec (i kolečkem)'],
     ],
   },
   {
     group: 'Zobrazení a ukládání',
     items: [
-      [['L'], 'laboratoř (panel) ukázat / schovat'],
-      [['G'], 'galerie světů'],
-      [['B'], 'živá síť'],
-      [['T'], 'stopy zapnout / vypnout'],
-      [['H'], 'skrýt celé rozhraní'],
-      [['F'], 'celá obrazovka'],
-      [['S'], 'uložit do oblíbených'],
-      [['C'], 'uložit obrázek (PNG)'],
-      [['U'], 'zkopírovat odkaz na svět'],
-      [['?'], 'tahle nápověda'],
+      ['L', 'laboratoř ukázat / schovat'],
+      ['G', 'galerie světů'],
+      ['B', 'živá síť'],
+      ['T', 'stopy zapnout / vypnout'],
+      ['H', 'skrýt celé rozhraní'],
+      ['F', 'celá obrazovka'],
+      ['S', 'uložit do oblíbených'],
+      ['C', 'uložit obrázek (PNG)'],
+      ['U', 'zkopírovat odkaz'],
+      ['?', 'tahle nápověda'],
     ],
   },
 ];
 
-function keysEl(keys: string[]): HTMLElement {
+function keysEl(spec: string): HTMLElement {
   const wrap = h('span', { class: 'keys' });
-  keys.forEach((k, i) => {
-    if (i > 0) wrap.append(h('span', { class: 'keys__plus' }, k.startsWith('+') ? '' : '+'));
-    wrap.append(k.startsWith('+') ? h('span', null, k.slice(1)) : h('kbd', { class: 'g92-kbd' }, k));
+  spec.split('/').forEach((alt, ai) => {
+    if (ai > 0) wrap.append(h('span', { class: 'keys__sep' }, '/'));
+    (alt === '+' ? ['+'] : alt.split('+')).forEach((k, i) => {
+      if (i > 0) wrap.append(h('span', { class: 'keys__sep' }, '+'));
+      wrap.append(k.startsWith('~') ? h('span', { class: 'keys__word' }, k.slice(1)) : h('kbd', { class: 'g92-kbd' }, k));
+    });
   });
   return wrap;
 }
@@ -90,7 +94,7 @@ export function openShortcuts(): void {
     icon: ICONS.keyboard,
     content: shortcutsContent(),
     wide: true,
-    actions: [{ label: 'Rozumím' }],
+    actions: [{ label: 'Rozumím', autofocus: true }],
     onClose: () => (open = null),
   });
 }

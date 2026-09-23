@@ -1711,8 +1711,8 @@ body.zen .coach {
 
 .shortcuts__list {
   display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 7px 12px;
+  grid-template-columns: minmax(64px, auto) 1fr;
+  gap: 5px 12px;
   margin: 0;
   align-items: center;
 }
@@ -1734,9 +1734,16 @@ body.zen .coach {
   font-size: var(--g92-fs-sm);
 }
 
-.keys__plus {
+.keys__sep {
   color: var(--g92-text-subtle);
   font-size: var(--g92-fs-xs);
+  margin-inline: 1px;
+}
+
+.keys__word {
+  font-size: var(--g92-fs-xs);
+  font-weight: var(--g92-fw-bold);
+  color: var(--g92-text-muted);
 }
 
 /* ---------------------------------------------------------------- medium screens */
